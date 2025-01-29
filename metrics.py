@@ -138,7 +138,7 @@ class DstVideo:
             total=butter_obj.num_frames,
             desc="Calculating Butteraugli scores",
             unit=" frame",
-            colour="blue",
+            colour="yellow",
         ) as pbar:
             for i, f in enumerate(butter_obj.frames()):
                 butter_list.append(f.props["_FrameButteraugli"])
