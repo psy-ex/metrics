@@ -72,6 +72,7 @@ class DstVideo:
             total=ssimu2_obj.num_frames,
             desc="Calculating SSIMULACRA2 scores",
             unit=" frame",
+            colour="blue",
         ) as pbar:
             for i, f in enumerate(ssimu2_obj.frames()):
                 ssimu2_list.append(f.props["_SSIMULACRA2"])
