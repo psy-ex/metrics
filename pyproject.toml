@@ -1,0 +1,11 @@
+[project]
+name = "metrics"
+version = "0.1.0"
+description = "Run metrics given a source video &amp; a distorted video."
+readme = "README.md"
+requires-python = ">=3.13.1"
+dependencies = [
+    "argparse>=1.4.0",
+    "tqdm>=4.67.1",
+    "vapoursynth>=70",
+]
