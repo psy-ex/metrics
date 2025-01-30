@@ -172,3 +172,4 @@ cython_debug/
 
 # uv
 uv.lock
+.ruff_cache/

@@ -18,52 +18,93 @@ from subprocess import Popen
 from sys import _xoptions
 
 import vapoursynth as vs
+from vapoursynth import VideoNode
 from tqdm import tqdm
 
 
-class SrcVideo:
+class CoreVideo:
     """
     Source video class.
     """
 
     path: str
     name: str
+    size: int
 
-    def __init__(self, pth: str) -> None:
+    video_width: int
+    video_height: int
+
+    # VapourSynth video object
+    video: VideoNode
+
+    def __init__(self, pth: str, e: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
+        self.size = self.get_input_filesize()
+        self.video = self.vapoursynth_init(e)
+
+    def get_input_filesize(self) -> int:
+        """
+        Get the input file size of the distorted video.
+        """
+        return os.path.getsize(self.path)
+
+    def vapoursynth_init(self, e: int) -> VideoNode:
+        """
+        Initialize VapourSynth video object for the distorted video.
+        """
+        core = vs.core
+        video = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
+        video = video.resize.Bicubic(format=vs.RGBS, matrix_in_s="709")
+        if e > 1:
+            video = video.std.SelectEvery(cycle=e, offsets=0)
+        return video
+
+    def get_video_dimensions(self) -> tuple[int, int]:
+        """
+        Get the width & height of the distorted video.
+        """
+        core = vs.core
+        src_data = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
+        return (src_data.width, src_data.height)
 
 
-class DstVideo:
+class DstVideo(CoreVideo):
     """
     Distorted video class containing metric scores.
     """
 
-    path: str
-    name: str
     # SSIMULACRA2 scores
     ssimu2_avg: float
     ssimu2_hmn: float
     ssimu2_sdv: float
     ssimu2_p10: float
+
     # Butteraugli scores
+    butter_dis: float
     butter_avg: float
     butter_hmn: float
     butter_sdv: float
     butter_p10: float
+
     # XPSNR scores
     xpsnr_y: float
     xpsnr_u: float
     xpsnr_v: float
     w_xpsnr: float
 
-    def __init__(self, pth: str) -> None:
+    def __init__(self, pth: str, e: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
+        self.size = self.get_input_filesize()
+        self.video_width, self.video_height = self.get_video_dimensions()
+        self.video = self.vapoursynth_init(e)
         self.ssimu2_avg = 0.0
         self.ssimu2_hmn = 0.0
         self.ssimu2_sdv = 0.0
         self.ssimu2_p10 = 0.0
+        self.butter_dis = 0.0
+        self.butter_mds = 0.0
         self.butter_avg = 0.0
         self.butter_hmn = 0.0
         self.butter_sdv = 0.0
@@ -73,23 +114,12 @@ class DstVideo:
         self.xpsnr_v = 0.0
         self.w_xpsnr = 0.0
 
-    def calculate_ssimulacra2(self, src: SrcVideo, e: int) -> None:
+    def calculate_ssimulacra2(self, src: CoreVideo, e: int) -> None:
         """
         Calculate SSIMULACRA2 score between a source video & a distorted video.
         """
-        core = vs.core
 
-        src_data = core.ffms2.Source(source=src.path, cache=False, threads=int(-1))
-        dst_data = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
-
-        src_data = src_data.resize.Bicubic(format=vs.RGBS, matrix_in_s="709")
-        dst_data = dst_data.resize.Bicubic(format=vs.RGBS, matrix_in_s="709")
-
-        if e > 1:
-            src_data = src_data.std.SelectEvery(cycle=e, offsets=0)
-            dst_data = dst_data.std.SelectEvery(cycle=e, offsets=0)
-
-        ssimu2_obj = src_data.vszip.Metrics(dst_data, [0])
+        ssimu2_obj = src.video.vszip.Metrics(self.video, [0])
 
         ssimu2_list: list[float] = []
         with tqdm(
@@ -102,12 +132,10 @@ class DstVideo:
                 ssimu2_list.append(f.props["_SSIMULACRA2"])
                 pbar.update(1)
                 if not i % 24:
-                    (average, harmonic_mean, std_dev, percentile_10th) = (
-                        calc_some_scores(ssimu2_list)
-                    )
+                    avg: float = sum(ssimu2_list) / len(ssimu2_list)
                     pbar.set_postfix(
                         {
-                            "avg": f"{average:.2f}",
+                            "avg": f"{avg:.2f}",
                         }
                     )
 
@@ -115,25 +143,15 @@ class DstVideo:
             calc_some_scores(ssimu2_list)
         )
 
-    def calculate_butteraugli(self, src: SrcVideo, e: int) -> None:
+    def calculate_butteraugli(self, src: CoreVideo, e: int) -> None:
         """
         Calculate Butteraugli score between a source video & a distorted video.
         """
-        core = vs.core
 
-        src_data = core.ffms2.Source(source=src.path, cache=False, threads=int(-1))
-        dst_data = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
-
-        src_data = src_data.resize.Bicubic(format=vs.RGBS, matrix_in_s="709")
-        dst_data = dst_data.resize.Bicubic(format=vs.RGBS, matrix_in_s="709")
-
-        if e > 1:
-            src_data = src_data.std.SelectEvery(cycle=e, offsets=0)
-            dst_data = dst_data.std.SelectEvery(cycle=e, offsets=0)
-
-        butter_obj = src_data.julek.Butteraugli(dst_data, [0])
+        butter_obj = src.video.julek.Butteraugli(self.video, [0])
 
         butter_list: list[float] = []
+        butter_distance_list: list[float] = []
         with tqdm(
             total=butter_obj.num_frames,
             desc="Calculating Butteraugli scores",
@@ -141,23 +159,25 @@ class DstVideo:
             colour="yellow",
         ) as pbar:
             for i, f in enumerate(butter_obj.frames()):
-                butter_list.append(f.props["_FrameButteraugli"])
+                d: float = f.props["_FrameButteraugli"]
+                butter_distance_list.append(d)
+                butter_list.append(butter_to_vbutter(d))
                 pbar.update(1)
                 if not i % 24:
-                    (average, harmonic_mean, std_dev, percentile_10th) = (
-                        calc_some_scores(butter_list)
-                    )
+                    dis: float = sum(butter_distance_list) / len(butter_distance_list)
                     pbar.set_postfix(
                         {
-                            "avg": f"{average:.2f}",
+                            "dis": f"{dis:.2f}",
                         }
                     )
 
+        self.butter_dis = sum(butter_distance_list) / len(butter_distance_list)
+        self.butter_mds = max(butter_distance_list)
         self.butter_avg, self.butter_hmn, self.butter_sdv, self.butter_p10 = (
             calc_some_scores(butter_list)
         )
 
-    def calculate_xpsnr(self, src: SrcVideo) -> None:
+    def calculate_xpsnr(self, src: CoreVideo) -> None:
         """
         Calculate XPSNR scores between a source video & a distorted video using FFmpeg.
         """
@@ -200,6 +220,29 @@ class DstVideo:
         xpsnr_mse_v: float = psnr_to_mse(self.xpsnr_v, maxval)
         w_xpsnr_mse: float = ((4.0 * xpsnr_mse_y) + xpsnr_mse_u + xpsnr_mse_v) / 6.0
         self.w_xpsnr = 10.0 * math.log10((maxval**2) / w_xpsnr_mse)
+
+    def write_csvs(self) -> None:
+        """
+        Write metric scores to CSV files.
+        """
+
+        if not os.path.exists(f"log_{self.name}"):
+            os.makedirs(f"log_{self.name}")
+
+        csv: str = f"log_{self.name}/{self.name}_hmean.csv"
+        with open(csv, "w") as f:
+            f.write("input_filesize,ssimu2_hmean,butter_distance,wxpsnr\n")
+            f.write(f"{self.size},{self.ssimu2_hmn},{self.butter_dis},{self.w_xpsnr}\n")
+
+
+def butter_to_vbutter(d: float) -> float:
+    """
+    Convert Butteraugli score to a "Video Butteraugli" score.
+    """
+    vb: float = 1.0
+    if d != 0.0:
+        vb: float = (math.log10((2.0 / (abs(d) + 2.0)) * 200.0)) - 1.30103
+    return vb * 100.0
 
 
 def psnr_to_mse(p: float, m: int) -> float:
@@ -245,12 +288,26 @@ def main() -> None:
         default=1,
         help="Only score every nth frame. Default 1 (every frame)",
     )
+    parser.add_argument(
+        "-c",
+        "--csv",
+        action="store_true",
+        help="Output scores to a CSV file",
+    )
+    parser.add_argument(
+        "-b",
+        "--vbutter",
+        action="store_true",
+        help="Output experimental vButter scores",
+    )
 
     args: Namespace = parser.parse_args()
     every: int = args.every
+    csv: bool = args.csv
+    vbutter: bool = args.vbutter
 
-    src: SrcVideo = SrcVideo(args.source)
-    dst: DstVideo = DstVideo(args.distorted)
+    src: CoreVideo = CoreVideo(args.source, every)
+    dst: DstVideo = DstVideo(args.distorted, every)
 
     print(f"Source video:    \033[4m{src.name}\033[0m")
     print(f"Distorted video: \033[4m{dst.name}\033[0m")
@@ -268,19 +325,26 @@ def main() -> None:
     print("Running \033[93mButteraugli\033[0m ...")
     dst.calculate_butteraugli(src, every)
     print(f"\033[93mButteraugli\033[0m scores for every \033[95m{every}\033[0m frame:")
-    print(f" Average:       \033[1m{dst.butter_avg:.5f}\033[0m")
-    print(f" Harmonic Mean: \033[1m{dst.butter_hmn:.5f}\033[0m")
-    print(f" Std Deviation: \033[1m{dst.butter_sdv:.5f}\033[0m")
-    print(f" 10th Pctile:   \033[1m{dst.butter_p10:.5f}\033[0m")
+    print(f" Distance:      \033[1m{dst.butter_dis:.5f}\033[0m")
+    print(f" Max Distance:  \033[1m{dst.butter_mds:.5f}\033[0m")
+    if vbutter:
+        print(f" Average:       \033[1m{dst.butter_avg:.5f}\033[0m")
+        print(f" Harmonic Mean: \033[1m{dst.butter_hmn:.5f}\033[0m")
+        print(f" Std Deviation: \033[1m{dst.butter_sdv:.5f}\033[0m")
+        print(f" 10th Pctile:   \033[1m{dst.butter_p10:.5f}\033[0m")
 
     # Calculate XPSNR scores
     print("Running \033[91mXPSNR\033[0m ...")
     dst.calculate_xpsnr(src)
     print("\033[91mXPSNR\033[0m scores:")
-    print(f" XPSNR Y: \033[1m{dst.xpsnr_y:.5f}\033[0m")
-    print(f" XPSNR U: \033[1m{dst.xpsnr_u:.5f}\033[0m")
-    print(f" XPSNR V: \033[1m{dst.xpsnr_v:.5f}\033[0m")
-    print(f" W-XPSNR: \033[1m{dst.w_xpsnr:.5f}\033[0m")
+    print(f" XPSNR Y:       \033[1m{dst.xpsnr_y:.5f}\033[0m")
+    print(f" XPSNR U:       \033[1m{dst.xpsnr_u:.5f}\033[0m")
+    print(f" XPSNR V:       \033[1m{dst.xpsnr_v:.5f}\033[0m")
+    print(f" W-XPSNR:       \033[1m{dst.w_xpsnr:.5f}\033[0m")
+
+    # Write scores to CSV
+    if csv:
+        dst.write_csvs()
 
 
 if __name__ == "__main__":
