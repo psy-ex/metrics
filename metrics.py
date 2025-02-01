@@ -3,6 +3,7 @@
 # requires-python = ">=3.13.1"
 # dependencies = [
 #     "argparse>=1.4.0",
+#     "statistics>=1.0.3.5",
 #     "tqdm>=4.67.1",
 #     "vapoursynth>=70",
 # ]
@@ -12,14 +13,14 @@ import argparse
 import math
 import os
 import re
+import statistics
 import subprocess
 from argparse import Namespace
 from subprocess import Popen
-from sys import _xoptions
 
 import vapoursynth as vs
-from vapoursynth import VideoNode
 from tqdm import tqdm
+from vapoursynth import VideoNode
 
 
 class CoreVideo:
@@ -256,7 +257,8 @@ def calc_some_scores(score_list: list[float]) -> tuple[float, float, float, floa
     """
     Calculate the average, harmonic mean, standard deviation, & 10th percentile of a list of scores.
     """
-    average: float = sum(score_list) / len(score_list)
+    average: float = statistics.mean(score_list)
+    std_dev: float = statistics.stdev(score_list)
     positive_scores: list[float] = [score for score in score_list if score > 0.0]
     negative_scores: list[float] = [score for score in score_list if score <= 0.0]
     if positive_scores:
@@ -268,10 +270,7 @@ def calc_some_scores(score_list: list[float]) -> tuple[float, float, float, floa
         harmonic_mean: float = len(positive_scores) / sum_reciprocals
     else:
         harmonic_mean: float = 0.0
-    std_dev: float = (
-        sum((x - average) ** 2 for x in score_list) / len(score_list)
-    ) ** 0.5
-    percentile_10th: float = sorted(score_list)[int(len(score_list) * 0.1)]
+    percentile_10th: float = statistics.quantiles(score_list, n=100)[10]
     return (average, harmonic_mean, std_dev, percentile_10th)
 
 
