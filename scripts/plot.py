@@ -77,7 +77,7 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
             # Offset increases with dataset index
             offset = 10 + idx * 5
             plt.annotate(
-                f"{label}:Q{df['q'][i]}",
+                f"Q{df['q'][i]}",
                 (x, y),
                 textcoords="offset points",
                 xytext=(0, offset),
