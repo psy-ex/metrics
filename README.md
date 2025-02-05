@@ -9,6 +9,14 @@ The three main scripts are:
 
 Read more below on how to install and use these utilities.
 
+## Sample Graphs
+
+![SSIMULACRA2](./static/ssimu2_hmean_plot.svg)
+
+![Butteraugli](./static/butter_distance_plot.svg)
+
+![W-XPSNR](./static/wxpsnr_plot.svg)
+
 ## Overview
 
 PSY-EX Metrics enables you to:
