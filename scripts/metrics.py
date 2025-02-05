@@ -239,7 +239,9 @@ class VideoEnc:
     encoder: str
     encoder_args: list[str]
 
-    def __init__(self, src_pth: str, q: int, encoder: str, encoder_args: list[str]) -> None:
+    def __init__(
+        self, src_pth: str, q: int, encoder: str, encoder_args: list[str]
+    ) -> None:
         self.enc_cmd = []
         self.src_pth = src_pth
         self.dst_pth = ""
@@ -291,7 +293,7 @@ class VideoEnc:
             "yuv4mpegpipe",
             "-",
         ]
-        print(f"Encoding video at {self.q} with {self.encoder} ...")
+        print(f"Encoding video at Q{self.q} with {self.encoder} ...")
         ff_proc: Popen[bytes] = subprocess.Popen(
             ff_cmd,
             stdout=subprocess.PIPE,
@@ -307,6 +309,12 @@ class VideoEnc:
         _, stderr = enc_proc.communicate()
         print(stderr)
         return self.dst_pth
+
+    def remove_output(self) -> None:
+        """
+        Remove the output file.
+        """
+        os.remove(self.dst_pth)
 
 
 def butter_to_vbutter(d: float) -> float:

@@ -61,6 +61,13 @@ def main():
         help="Only score every nth frame. Default 1 (every frame)",
     )
     parser.add_argument(
+        "-c",
+        "--clean",
+        type=bool,
+        default=True,
+        help="Clean up output files after scoring",
+    )
+    parser.add_argument(
         "encoder_args",
         nargs=argparse.REMAINDER,
         type=str,
@@ -68,12 +75,13 @@ def main():
     )
 
     args: Namespace = parser.parse_args()
-    quality_list: list[int] = [int(q) for q in args.quality.split()]
     src_pth: str = args.input
+    quality_list: list[int] = [int(q) for q in args.quality.split()]
     enc: str = args.encoder
-    enc_args: list[str] = args.encoder_args
-    every: int = args.every
     csv_out: str = args.output
+    every: int = args.every
+    clean: bool = args.clean
+    enc_args: list[str] = args.encoder_args
 
     s: CoreVideo = CoreVideo(src_pth, every)
     print(f"Source video: {s.name}")
@@ -91,6 +99,8 @@ def main():
         v.calculate_butteraugli(s)
         v.calculate_xpsnr(s)
         write_stats(csv_out, q, v)
+        if clean:
+            e.remove_output()
 
 
 if __name__ == "__main__":
