@@ -32,7 +32,7 @@ def write_stats(name: str, q: int, dst: DstVideo) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Process a video file with a given encoder and options."
+        description="Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes."
     )
     parser.add_argument(
         "-i", "--input", required=True, type=str, help="Path to source video file"
