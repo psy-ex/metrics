@@ -1,21 +1,8 @@
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.13.1"
-# dependencies = [
-#     "argparse>=1.4.0",
-#     "statistics>=1.0.3.5",
-#     "tqdm>=4.67.1",
-#     "vapoursynth>=70",
-# ]
-# ///
-
-import argparse
 import math
 import os
 import re
 import statistics
 import subprocess
-from argparse import Namespace
 from subprocess import Popen
 
 import vapoursynth as vs
@@ -115,7 +102,7 @@ class DstVideo(CoreVideo):
         self.xpsnr_v = 0.0
         self.w_xpsnr = 0.0
 
-    def calculate_ssimulacra2(self, src: CoreVideo, e: int) -> None:
+    def calculate_ssimulacra2(self, src: CoreVideo) -> None:
         """
         Calculate SSIMULACRA2 score between a source video & a distorted video.
         """
@@ -144,7 +131,10 @@ class DstVideo(CoreVideo):
             calc_some_scores(ssimu2_list)
         )
 
-    def calculate_butteraugli(self, src: CoreVideo, e: int) -> None:
+    def calculate_butteraugli(
+        self,
+        src: CoreVideo,
+    ) -> None:
         """
         Calculate Butteraugli score between a source video & a distorted video.
         """
@@ -197,6 +187,7 @@ class DstVideo(CoreVideo):
             "-",
         ]
 
+        print("Calculating XPSNR scores...")
         process: Popen[str] = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
         )
@@ -236,6 +227,88 @@ class DstVideo(CoreVideo):
             f.write(f"{self.size},{self.ssimu2_hmn},{self.butter_dis},{self.w_xpsnr}\n")
 
 
+class VideoEnc:
+    """
+    Video encoding class, containing encoder commands.
+    """
+
+    enc_cmd: list[str]
+    src_pth: str
+    dst_pth: str
+    q: int
+    encoder: str
+    encoder_args: list[str]
+
+    def __init__(self, src_pth: str, q: int, encoder: str, encoder_args: list[str]) -> None:
+        self.enc_cmd = []
+        self.src_pth = src_pth
+        self.dst_pth = ""
+        self.q = q
+        self.encoder = encoder
+        self.encoder_args = encoder_args if encoder_args else [""]
+        self.enc_cmd = self.set_enc_cmd()
+
+    def set_enc_cmd(self) -> list[str]:
+        p: str = os.path.splitext(os.path.basename(self.src_pth))[0]
+        self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
+        print(f"Selected encoder: {self.encoder}")
+        print(f"Encoding {self.src_pth} to {self.dst_pth} ...")
+        cmd: list[str] = [
+            "SvtAv1EncApp",
+            "-i",
+            "-",
+            "-b",
+            f"{self.dst_pth}",
+            "--crf",
+            f"{self.q}",
+        ]
+        if self.encoder_args:
+            # Handle both string and list inputs
+            if isinstance(self.encoder_args, str):
+                cmd.extend(self.encoder_args.split())
+            elif isinstance(self.encoder_args, list):
+                cmd.extend(self.encoder_args)
+        print(" ".join(cmd))
+        return cmd
+
+    def encode(self) -> str:
+        """
+        Encode the video using FFmpeg piped to your chosen encoder.
+        """
+        ff_cmd: list[str] = [
+            "ffmpeg",
+            "-hide_banner",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            f"{self.src_pth}",
+            "-pix_fmt",
+            "yuv420p10le",
+            "-strict",
+            "-2",
+            "-f",
+            "yuv4mpegpipe",
+            "-",
+        ]
+        print(f"Encoding video at {self.q} with {self.encoder} ...")
+        ff_proc: Popen[bytes] = subprocess.Popen(
+            ff_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        enc_proc: Popen[str] = subprocess.Popen(
+            self.enc_cmd,
+            stdin=ff_proc.stdout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        _, stderr = enc_proc.communicate()
+        print(stderr)
+        return self.dst_pth
+
+
 def butter_to_vbutter(d: float) -> float:
     """
     Convert Butteraugli score to a "Video Butteraugli" score.
@@ -272,79 +345,3 @@ def calc_some_scores(score_list: list[float]) -> tuple[float, float, float, floa
         harmonic_mean: float = 0.0
     percentile_10th: float = statistics.quantiles(score_list, n=100)[10]
     return (average, harmonic_mean, std_dev, percentile_10th)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Run metrics given a source video & a distorted video."
-    )
-    parser.add_argument("source", help="Source video path")
-    parser.add_argument("distorted", help="Distorted video path")
-    parser.add_argument(
-        "-e",
-        "--every",
-        type=int,
-        default=1,
-        help="Only score every nth frame. Default 1 (every frame)",
-    )
-    parser.add_argument(
-        "-c",
-        "--csv",
-        action="store_true",
-        help="Output scores to a CSV file",
-    )
-    parser.add_argument(
-        "-b",
-        "--vbutter",
-        action="store_true",
-        help="Output experimental vButter scores",
-    )
-
-    args: Namespace = parser.parse_args()
-    every: int = args.every
-    csv: bool = args.csv
-    vbutter: bool = args.vbutter
-
-    src: CoreVideo = CoreVideo(args.source, every)
-    dst: DstVideo = DstVideo(args.distorted, every)
-
-    print(f"Source video:    \033[4m{src.name}\033[0m")
-    print(f"Distorted video: \033[4m{dst.name}\033[0m")
-
-    # Calculate SSIMULACRA2 scores
-    print("Running \033[94mSSIMULACRA2\033[0m ...")
-    dst.calculate_ssimulacra2(src, every)
-    print(f"\033[94mSSIMULACRA2\033[0m scores for every \033[95m{every}\033[0m frame:")
-    print(f" Average:       \033[1m{dst.ssimu2_avg:.5f}\033[0m")
-    print(f" Harmonic Mean: \033[1m{dst.ssimu2_hmn:.5f}\033[0m")
-    print(f" Std Deviation: \033[1m{dst.ssimu2_sdv:.5f}\033[0m")
-    print(f" 10th Pctile:   \033[1m{dst.ssimu2_p10:.5f}\033[0m")
-
-    # Calculate Butteraugli scores
-    print("Running \033[93mButteraugli\033[0m ...")
-    dst.calculate_butteraugli(src, every)
-    print(f"\033[93mButteraugli\033[0m scores for every \033[95m{every}\033[0m frame:")
-    print(f" Distance:      \033[1m{dst.butter_dis:.5f}\033[0m")
-    print(f" Max Distance:  \033[1m{dst.butter_mds:.5f}\033[0m")
-    if vbutter:
-        print(f" Average:       \033[1m{dst.butter_avg:.5f}\033[0m")
-        print(f" Harmonic Mean: \033[1m{dst.butter_hmn:.5f}\033[0m")
-        print(f" Std Deviation: \033[1m{dst.butter_sdv:.5f}\033[0m")
-        print(f" 10th Pctile:   \033[1m{dst.butter_p10:.5f}\033[0m")
-
-    # Calculate XPSNR scores
-    print("Running \033[91mXPSNR\033[0m ...")
-    dst.calculate_xpsnr(src)
-    print("\033[91mXPSNR\033[0m scores:")
-    print(f" XPSNR Y:       \033[1m{dst.xpsnr_y:.5f}\033[0m")
-    print(f" XPSNR U:       \033[1m{dst.xpsnr_u:.5f}\033[0m")
-    print(f" XPSNR V:       \033[1m{dst.xpsnr_v:.5f}\033[0m")
-    print(f" W-XPSNR:       \033[1m{dst.w_xpsnr:.5f}\033[0m")
-
-    # Write scores to CSV
-    if csv:
-        dst.write_csvs()
-
-
-if __name__ == "__main__":
-    main()
