@@ -48,6 +48,9 @@ def main():
         type=str,
         help="Additional encoder arguments (pass these after a '--' delimiter)",
     )
+    parser.add_argument(
+        "-n", "--no-metrics", action="store_true", help="Skip metrics calculations"
+    )
 
     args: Namespace = parser.parse_args()
     src_pth: str = args.input
@@ -56,6 +59,7 @@ def main():
     enc: str = args.encoder
     every: int = args.every
     enc_args: list[str] = args.encoder_args
+    run_metrics: bool = not args.no_metrics
 
     s: CoreVideo = CoreVideo(src_pth, every)
     print(f"Source video: {s.name}")
@@ -68,15 +72,17 @@ def main():
     v: DstVideo = e.encode(every)
     print(f"Encoded video: {e.dst_pth}")
 
-    v.calculate_ssimulacra2(s)
-    v.print_ssimulacra2()
-    v.calculate_butteraugli(s)
-    v.print_butteraugli()
-    v.calculate_xpsnr(s)
-    v.print_xpsnr()
+    if run_metrics:
+        v.calculate_ssimulacra2(s)
+        v.print_ssimulacra2()
+        v.calculate_butteraugli(s)
+        v.print_butteraugli()
+        v.calculate_xpsnr(s)
+        v.print_xpsnr()
 
     if not dst_pth:
         e.remove_output()
+        print("Discarded encoded video")
 
 
 if __name__ == "__main__":

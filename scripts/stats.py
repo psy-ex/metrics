@@ -65,11 +65,11 @@ def main():
         help="Only score every nth frame. Default 1 (every frame)",
     )
     parser.add_argument(
-        "-c",
-        "--clean",
-        type=bool,
+        "-k",
+        "--keep",
         default=True,
-        help="Clean up output files after scoring",
+        action="store_false",
+        help="Keep output video files",
     )
     parser.add_argument(
         "encoder_args",
@@ -84,7 +84,7 @@ def main():
     enc: str = args.encoder
     csv_out: str = args.output
     every: int = args.every
-    clean: bool = args.clean
+    clean: bool = args.keep
     enc_args: list[str] = args.encoder_args
 
     s: CoreVideo = CoreVideo(src_pth, every)

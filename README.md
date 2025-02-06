@@ -1,12 +1,21 @@
 # PSY-EX Metrics
 
-The Psychovisual Experts group presents `metrics`, a video quality assessment toolkit that provides a suite of scripts for measuring and comparing video codecs using metrics such as SSIMULACRA2, Butteraugli, and XPSNR. The project includes modules for processing video files, running video encoding, and generating both numerical and visual reports from quality metrics.
+The Psychovisual Experts group presents `metrics`, a video quality assessment
+toolkit that provides a suite of scripts for measuring and comparing video
+codecs using metrics such as SSIMULACRA2, Butteraugli, and XPSNR. The project
+includes modules for processing video files, running video encoding, and
+generating both numerical and visual reports from quality metrics.
 
 The three main scripts are:
-- `scores.py`: Compute detailed quality scores for a given source/distorted video pair.
-- `encode.py`: Encode videos using various codecs (e.g., x264, x265, svtav1, aomenc) and print metrics.
-- `stats.py`: Encode videos at various quality settings and log metric statistics to a CSV file.
-- `plot.py`: Generate visual plots from CSV metric data for side-by-side codec comparison.
+
+- `scores.py`: Compute detailed quality scores for a given source/distorted
+  video pair.
+- `encode.py`: Encode videos using various codecs (e.g., x264, x265, svtav1,
+  aomenc) and print metrics.
+- `stats.py`: Encode videos at various quality settings and log metric
+  statistics to a CSV file.
+- `plot.py`: Generate visual plots from CSV metric data for side-by-side codec
+  comparison.
 
 Read more below on how to install and use these utilities.
 
@@ -23,24 +32,26 @@ Read more below on how to install and use these utilities.
 PSY-EX Metrics enables you to:
 
 - Encode videos using various codecs (e.g., x264, x265, svtav1, aomenc).
-    - (Currently, only SVT-AV1 is supported)
+  - (Currently, only SVT-AV1 is supported)
 - Calculate visual quality & distance metrics, such as:
-    - SSIMULACRA2
-    - Butteraugli
-    - Weighted XPSNR
+  - SSIMULACRA2
+  - Butteraugli
+  - Weighted XPSNR
 - Generate CSV files with computed metric statistics for further analysis.
-- Visualize the metrics side-by-side, comparing codec results through customizable plots.
+- Visualize the metrics side-by-side, comparing codec results through
+  customizable plots.
 
 ## Installation
 
 ### Dependencies
 
-- [uv](https://github.com/astral-sh/uv/blob/main/README.md), a Python project manager
+- [uv](https://github.com/astral-sh/uv/blob/main/README.md), a Python project
+  manager
 - FFmpeg >= 7.1 (for XPSNR calculations)
 - VapourSynth, and required plugins:
-    - ffms2
-    - [vszip](https://github.com/dnjulek/vapoursynth-zip)
-    - [julek](https://github.com/dnjulek/vapoursynth-julek-plugin)
+  - ffms2
+  - [vszip](https://github.com/dnjulek/vapoursynth-zip)
+  - [julek](https://github.com/dnjulek/vapoursynth-julek-plugin)
 
 ### Install Steps
 
@@ -91,20 +102,24 @@ Example:
 ./scores.py source.mkv distorted.mkv -e 3
 ```
 
-This command compares a reference `source.mkv` with `distorted.mkv`, scoring every 3rd frame.
+This command compares a reference `source.mkv` with `distorted.mkv`, scoring
+every 3rd frame.
 
 ### encode.py
 
 ```bash
 % ./encode.py --help
-usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] {x264,x265,svtav1,aomenc} ...
+usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-n]
+                 {x264,x265,svtav1,aomenc} ...
 
-Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
+Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video
+encodes.
 
 positional arguments:
   {x264,x265,svtav1,aomenc}
                         Which video encoder to use
-  encoder_args          Additional encoder arguments (pass these after a '--' delimiter)
+  encoder_args          Additional encoder arguments (pass these after a '--'
+                        delimiter)
 
 options:
   -h, --help            show this help message and exit
@@ -113,6 +128,7 @@ options:
                         Desired CRF value for the encoder
   -b, --keep KEEP       Output video file name
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
+  -n, --no-metrics      Skip metrics calculations
 ```
 
 Example:
@@ -121,20 +137,24 @@ Example:
 ./encode.py -i source.mkv --keep video.ivf -q 29 svtav1 -- --preset 2
 ```
 
-This command encodes `tennis_sif.m4v` at a CRF of 29 using the SVT-AV1 encoder with the `--preset 2` argument. It will print metrics after encoding.
+This command encodes `tennis_sif.m4v` at a CRF of 29 using the SVT-AV1 encoder
+with the `--preset 2` argument. It will print metrics after encoding.
 
 ### stats.py
 
 ```bash
 ./stats.py --help
-usage: stats.py [-h] -i INPUT -q QUALITY -o OUTPUT [-e EVERY] [-c CLEAN] {x264,x265,svtav1,aomenc} ...
+usage: stats.py [-h] -i INPUT -q QUALITY -o OUTPUT [-e EVERY] [-k]
+                {x264,x265,svtav1,aomenc} ...
 
-Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
+Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video
+encodes.
 
 positional arguments:
   {x264,x265,svtav1,aomenc}
                         Which video encoder to use
-  encoder_args          Additional encoder arguments (pass these after a '--' delimiter)
+  encoder_args          Additional encoder arguments (pass these after a '--'
+                        delimiter)
 
 options:
   -h, --help            show this help message and exit
@@ -143,7 +163,7 @@ options:
                         List of quality values to test (e.g. 20 30 40 50)
   -o, --output OUTPUT   Path to output CSV file
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
-  -c, --clean CLEAN     Clean up output files after scoring
+  -k, --keep            Keep output video files
 ```
 
 Example:
@@ -157,7 +177,9 @@ Example:
   svtav1 -- --preset 8 --tune 2
 ```
 
-This command processes `source.mkv` at quality levels 20, 25, 30, 35, & 40 using the SVT-AV1 encoder, scoring every 3rd frame, and writes the results to an output `svtav1_2.3.0-B_p8.csv`.
+This command processes `source.mkv` at quality levels 20, 25, 30, 35, & 40 using
+the SVT-AV1 encoder, scoring every 3rd frame, and writes the results to an
+output `svtav1_2.3.0-B_p8.csv`.
 
 You can also script this to run across multiple speed presets:
 
@@ -174,7 +196,8 @@ for speed in {2..6}; do
 done
 ```
 
-This snippet here will run the same command as before, but across all speed presets from 2 to 6 (naming the output CSV files accordingly).
+This snippet here will run the same command as before, but across all speed
+presets from 2 to 6 (naming the output CSV files accordingly).
 
 ### plot.py
 
@@ -197,10 +220,14 @@ Example:
 ./plot.py -i codec1_results.csv codec2_results.csv -f webp
 ```
 
-This command reads `codec1_results.csv` and `codec2_results.csv`, generating separate plots (one for each metric: SSIMULACRA2, Butteraugli, and XPSNR) as WebP images.
+This command reads `codec1_results.csv` and `codec2_results.csv`, generating
+separate plots (one for each metric: SSIMULACRA2, Butteraugli, and XPSNR) as
+WebP images.
 
 ## License
 
-This project was originally authored by @gianni-rosato & is provided as FOSS through the Psychovisual Experts Group.
+This project was originally authored by @gianni-rosato & is provided as FOSS
+through the Psychovisual Experts Group.
 
-Usage is subject to the terms of the [LICENSE](LICENSE). Please refer to the linked file for more information.
+Usage is subject to the terms of the [LICENSE](LICENSE). Please refer to the
+linked file for more information.
