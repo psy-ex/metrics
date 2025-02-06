@@ -66,7 +66,7 @@ def main():
     else:
         e: VideoEnc = VideoEnc(src_pth, q, enc, enc_args)
     _ = e.encode()
-    print(f"Encoded video: {dst_pth}")
+    print(f"Encoded video: {e.dst_pth}")
 
     v: DstVideo = DstVideo(e.dst_pth, every)
     v.calculate_ssimulacra2(s)
