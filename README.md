@@ -4,6 +4,7 @@ The Psychovisual Experts group presents `metrics`, a video quality assessment to
 
 The three main scripts are:
 - `scores.py`: Compute detailed quality scores for a given source/distorted video pair.
+- `encode.py`: Encode videos using various codecs (e.g., x264, x265, svtav1, aomenc) and print metrics.
 - `stats.py`: Encode videos at various quality settings and log metric statistics to a CSV file.
 - `plot.py`: Generate visual plots from CSV metric data for side-by-side codec comparison.
 
@@ -56,16 +57,14 @@ cd metrics/
 
 ```bash
 cd scripts/
-chmod a+x stats.py scores.py plot.py
+chmod a+x stats.py scores.py plot.py encode.py
 ```
 
-3. Run the script
+3. Run a script
 
 ```bash
 ./scores.py source.mkv distorted.mkv
 ```
-
----
 
 ## Usage
 
@@ -84,8 +83,6 @@ positional arguments:
 options:
   -h, --help         show this help message and exit
   -e, --every EVERY  Only score every nth frame. Default 1 (every frame)
-  -c, --csv          Output scores to a CSV file
-  -b, --vbutter      Output experimental vButter scores
 ```
 
 Example:
@@ -95,6 +92,36 @@ Example:
 ```
 
 This command compares a reference `source.mkv` with `distorted.mkv`, scoring every 3rd frame.
+
+### encode.py
+
+```bash
+% ./encode.py --help
+usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] {x264,x265,svtav1,aomenc} ...
+
+Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
+
+positional arguments:
+  {x264,x265,svtav1,aomenc}
+                        Which video encoder to use
+  encoder_args          Additional encoder arguments (pass these after a '--' delimiter)
+
+options:
+  -h, --help            show this help message and exit
+  -i, --input INPUT     Path to source video file
+  -q, --quality QUALITY
+                        Desired CRF value for the encoder
+  -b, --keep KEEP       Output video file name
+  -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
+```
+
+Example:
+
+```bash
+./encode.py -i source.mkv --keep video.ivf -q 29 svtav1 -- --preset 2
+```
+
+This command encodes `tennis_sif.m4v` at a CRF of 29 using the SVT-AV1 encoder with the `--preset 2` argument. It will print metrics after encoding.
 
 ### stats.py
 
