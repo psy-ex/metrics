@@ -243,7 +243,7 @@ class VideoEnc:
     """
 
     enc_cmd: list[str]
-    src_pth: str
+    src: CoreVideo
     dst_pth: str
     q: int
     encoder: str
@@ -251,14 +251,14 @@ class VideoEnc:
 
     def __init__(
         self,
-        src_pth: str,
+        src: CoreVideo,
         q: int,
         encoder: str,
         encoder_args: list[str],
         dst_pth: str = "",
     ) -> None:
         self.enc_cmd = []
-        self.src_pth = src_pth
+        self.src = src
         self.dst_pth = dst_pth
         self.q = q
         self.encoder = encoder
@@ -266,11 +266,11 @@ class VideoEnc:
         self.enc_cmd = self.set_enc_cmd()
 
     def set_enc_cmd(self) -> list[str]:
-        p: str = os.path.splitext(os.path.basename(self.src_pth))[0]
+        p: str = os.path.splitext(os.path.basename(self.src.path))[0]
         if not self.dst_pth:
             self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
         print(f"Selected encoder: {self.encoder}")
-        print(f"Encoding {self.src_pth} to {self.dst_pth} ...")
+        print(f"Encoding {self.src.path} to {self.dst_pth} ...")
         cmd: list[str] = [
             "SvtAv1EncApp",
             "-i",
@@ -285,7 +285,7 @@ class VideoEnc:
         print(" ".join(cmd))
         return cmd
 
-    def encode(self) -> str:
+    def encode(self, e: int) -> DstVideo:
         """
         Encode the video using FFmpeg piped to your chosen encoder.
         """
@@ -296,7 +296,7 @@ class VideoEnc:
             "-loglevel",
             "error",
             "-i",
-            f"{self.src_pth}",
+            f"{self.src.path}",
             "-pix_fmt",
             "yuv420p10le",
             "-strict",
@@ -320,7 +320,7 @@ class VideoEnc:
         )
         _, stderr = enc_proc.communicate()
         print(stderr)
-        return self.dst_pth
+        return DstVideo(self.dst_pth, e)
 
     def remove_output(self) -> None:
         """

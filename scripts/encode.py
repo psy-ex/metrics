@@ -31,7 +31,6 @@ def main():
     parser.add_argument(
         "encoder",
         choices=["x264", "x265", "svtav1", "aomenc"],
-        required=True,
         type=str,
         help="Which video encoder to use",
     )
@@ -63,13 +62,12 @@ def main():
 
     print(f"Running encoder at Q{q}")
     if dst_pth:
-        e: VideoEnc = VideoEnc(src_pth, q, enc, enc_args, dst_pth)
+        e: VideoEnc = VideoEnc(s, q, enc, enc_args, dst_pth)
     else:
-        e: VideoEnc = VideoEnc(src_pth, q, enc, enc_args)
-    _ = e.encode()
+        e: VideoEnc = VideoEnc(s, q, enc, enc_args)
+    v: DstVideo = e.encode(every)
     print(f"Encoded video: {e.dst_pth}")
 
-    v: DstVideo = DstVideo(e.dst_pth, every)
     v.calculate_ssimulacra2(s)
     v.print_ssimulacra2()
     v.calculate_butteraugli(s)
