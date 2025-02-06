@@ -18,6 +18,7 @@ class CoreVideo:
     path: str
     name: str
     size: int
+    e: int
 
     video_width: int
     video_height: int
@@ -29,7 +30,8 @@ class CoreVideo:
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
-        self.video = self.vapoursynth_init(e)
+        self.e = e
+        self.video = self.vapoursynth_init()
 
     def get_input_filesize(self) -> int:
         """
@@ -37,15 +39,15 @@ class CoreVideo:
         """
         return os.path.getsize(self.path)
 
-    def vapoursynth_init(self, e: int) -> VideoNode:
+    def vapoursynth_init(self) -> VideoNode:
         """
         Initialize VapourSynth video object for the distorted video.
         """
         core = vs.core
         video = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
         video = video.resize.Bicubic(format=vs.RGBS, matrix_in_s="709")
-        if e > 1:
-            video = video.std.SelectEvery(cycle=e, offsets=0)
+        if self.e > 1:
+            video = video.std.SelectEvery(cycle=self.e, offsets=0)
         return video
 
     def get_video_dimensions(self) -> tuple[int, int]:
@@ -70,10 +72,7 @@ class DstVideo(CoreVideo):
 
     # Butteraugli scores
     butter_dis: float
-    butter_avg: float
-    butter_hmn: float
-    butter_sdv: float
-    butter_p10: float
+    butter_mds: float
 
     # XPSNR scores
     xpsnr_y: float
@@ -85,18 +84,15 @@ class DstVideo(CoreVideo):
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
+        self.e = e
         self.video_width, self.video_height = self.get_video_dimensions()
-        self.video = self.vapoursynth_init(e)
+        self.video = self.vapoursynth_init()
         self.ssimu2_avg = 0.0
         self.ssimu2_hmn = 0.0
         self.ssimu2_sdv = 0.0
         self.ssimu2_p10 = 0.0
         self.butter_dis = 0.0
         self.butter_mds = 0.0
-        self.butter_avg = 0.0
-        self.butter_hmn = 0.0
-        self.butter_sdv = 0.0
-        self.butter_p10 = 0.0
         self.xpsnr_y = 0.0
         self.xpsnr_u = 0.0
         self.xpsnr_v = 0.0
@@ -141,7 +137,6 @@ class DstVideo(CoreVideo):
 
         butter_obj = src.video.julek.Butteraugli(self.video, [0])
 
-        butter_list: list[float] = []
         butter_distance_list: list[float] = []
         with tqdm(
             total=butter_obj.num_frames,
@@ -152,7 +147,6 @@ class DstVideo(CoreVideo):
             for i, f in enumerate(butter_obj.frames()):
                 d: float = f.props["_FrameButteraugli"]
                 butter_distance_list.append(d)
-                butter_list.append(butter_to_vbutter(d))
                 pbar.update(1)
                 if not i % 24:
                     dis: float = sum(butter_distance_list) / len(butter_distance_list)
@@ -164,9 +158,6 @@ class DstVideo(CoreVideo):
 
         self.butter_dis = sum(butter_distance_list) / len(butter_distance_list)
         self.butter_mds = max(butter_distance_list)
-        self.butter_avg, self.butter_hmn, self.butter_sdv, self.butter_p10 = (
-            calc_some_scores(butter_list)
-        )
 
     def calculate_xpsnr(self, src: CoreVideo) -> None:
         """
@@ -213,18 +204,37 @@ class DstVideo(CoreVideo):
         w_xpsnr_mse: float = ((4.0 * xpsnr_mse_y) + xpsnr_mse_u + xpsnr_mse_v) / 6.0
         self.w_xpsnr = 10.0 * math.log10((maxval**2) / w_xpsnr_mse)
 
-    def write_csvs(self) -> None:
+    def print_ssimulacra2(self) -> None:
         """
-        Write metric scores to CSV files.
+        Print SSIMULACRA2 scores.
         """
+        print(
+            f"\033[94mSSIMULACRA2\033[0m scores for every \033[95m{self.e}\033[0m frame:"
+        )
+        print(f" Average:       \033[1m{self.ssimu2_avg:.5f}\033[0m")
+        print(f" Harmonic Mean: \033[1m{self.ssimu2_hmn:.5f}\033[0m")
+        print(f" Std Deviation: \033[1m{self.ssimu2_sdv:.5f}\033[0m")
+        print(f" 10th Pctile:   \033[1m{self.ssimu2_p10:.5f}\033[0m")
 
-        if not os.path.exists(f"log_{self.name}"):
-            os.makedirs(f"log_{self.name}")
+    def print_butteraugli(self) -> None:
+        """
+        Print Butteraugli scores.
+        """
+        print(
+            f"\033[93mButteraugli\033[0m scores for every \033[95m{self.e}\033[0m frame:"
+        )
+        print(f" Distance:      \033[1m{self.butter_dis:.5f}\033[0m")
+        print(f" Max Distance:  \033[1m{self.butter_mds:.5f}\033[0m")
 
-        csv: str = f"log_{self.name}/{self.name}_hmean.csv"
-        with open(csv, "w") as f:
-            f.write("input_filesize,ssimu2_hmean,butter_distance,wxpsnr\n")
-            f.write(f"{self.size},{self.ssimu2_hmn},{self.butter_dis},{self.w_xpsnr}\n")
+    def print_xpsnr(self) -> None:
+        """
+        Print XPSNR scores.
+        """
+        print("\033[91mXPSNR\033[0m scores:")
+        print(f" XPSNR Y:       \033[1m{self.xpsnr_y:.5f}\033[0m")
+        print(f" XPSNR U:       \033[1m{self.xpsnr_u:.5f}\033[0m")
+        print(f" XPSNR V:       \033[1m{self.xpsnr_v:.5f}\033[0m")
+        print(f" W-XPSNR:       \033[1m{self.w_xpsnr:.5f}\033[0m")
 
 
 class VideoEnc:
@@ -240,11 +250,16 @@ class VideoEnc:
     encoder_args: list[str]
 
     def __init__(
-        self, src_pth: str, q: int, encoder: str, encoder_args: list[str]
+        self,
+        src_pth: str,
+        q: int,
+        encoder: str,
+        encoder_args: list[str],
+        dst_pth: str = "",
     ) -> None:
         self.enc_cmd = []
         self.src_pth = src_pth
-        self.dst_pth = ""
+        self.dst_pth = dst_pth
         self.q = q
         self.encoder = encoder
         self.encoder_args = encoder_args if encoder_args else [""]
@@ -252,7 +267,8 @@ class VideoEnc:
 
     def set_enc_cmd(self) -> list[str]:
         p: str = os.path.splitext(os.path.basename(self.src_pth))[0]
-        self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
+        if not self.dst_pth:
+            self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
         print(f"Selected encoder: {self.encoder}")
         print(f"Encoding {self.src_pth} to {self.dst_pth} ...")
         cmd: list[str] = [
@@ -264,12 +280,8 @@ class VideoEnc:
             "--crf",
             f"{self.q}",
         ]
-        if self.encoder_args:
-            # Handle both string and list inputs
-            if isinstance(self.encoder_args, str):
-                cmd.extend(self.encoder_args.split())
-            elif isinstance(self.encoder_args, list):
-                cmd.extend(self.encoder_args)
+        if self.encoder_args != [""]:
+            cmd.extend(self.encoder_args)
         print(" ".join(cmd))
         return cmd
 
@@ -315,16 +327,6 @@ class VideoEnc:
         Remove the output file.
         """
         os.remove(self.dst_pth)
-
-
-def butter_to_vbutter(d: float) -> float:
-    """
-    Convert Butteraugli score to a "Video Butteraugli" score.
-    """
-    vb: float = 1.0
-    if d != 0.0:
-        vb: float = (math.log10((2.0 / (abs(d) + 2.0)) * 200.0)) - 1.30103
-    return vb * 100.0
 
 
 def psnr_to_mse(p: float, m: int) -> float:

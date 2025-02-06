@@ -27,23 +27,9 @@ def main() -> None:
         default=1,
         help="Only score every nth frame. Default 1 (every frame)",
     )
-    parser.add_argument(
-        "-c",
-        "--csv",
-        action="store_true",
-        help="Output scores to a CSV file",
-    )
-    parser.add_argument(
-        "-b",
-        "--vbutter",
-        action="store_true",
-        help="Output experimental vButter scores",
-    )
 
     args: Namespace = parser.parse_args()
     every: int = args.every
-    csv: bool = args.csv
-    vbutter: bool = args.vbutter
 
     src: CoreVideo = CoreVideo(args.source, every)
     dst: DstVideo = DstVideo(args.distorted, every)
@@ -54,36 +40,17 @@ def main() -> None:
     # Calculate SSIMULACRA2 scores
     print("Running \033[94mSSIMULACRA2\033[0m ...")
     dst.calculate_ssimulacra2(src)
-    print(f"\033[94mSSIMULACRA2\033[0m scores for every \033[95m{every}\033[0m frame:")
-    print(f" Average:       \033[1m{dst.ssimu2_avg:.5f}\033[0m")
-    print(f" Harmonic Mean: \033[1m{dst.ssimu2_hmn:.5f}\033[0m")
-    print(f" Std Deviation: \033[1m{dst.ssimu2_sdv:.5f}\033[0m")
-    print(f" 10th Pctile:   \033[1m{dst.ssimu2_p10:.5f}\033[0m")
+    dst.print_ssimulacra2()
 
     # Calculate Butteraugli scores
     print("Running \033[93mButteraugli\033[0m ...")
     dst.calculate_butteraugli(src)
-    print(f"\033[93mButteraugli\033[0m scores for every \033[95m{every}\033[0m frame:")
-    print(f" Distance:      \033[1m{dst.butter_dis:.5f}\033[0m")
-    print(f" Max Distance:  \033[1m{dst.butter_mds:.5f}\033[0m")
-    if vbutter:
-        print(f" Average:       \033[1m{dst.butter_avg:.5f}\033[0m")
-        print(f" Harmonic Mean: \033[1m{dst.butter_hmn:.5f}\033[0m")
-        print(f" Std Deviation: \033[1m{dst.butter_sdv:.5f}\033[0m")
-        print(f" 10th Pctile:   \033[1m{dst.butter_p10:.5f}\033[0m")
+    dst.print_butteraugli()
 
     # Calculate XPSNR scores
     print("Running \033[91mXPSNR\033[0m ...")
     dst.calculate_xpsnr(src)
-    print("\033[91mXPSNR\033[0m scores:")
-    print(f" XPSNR Y:       \033[1m{dst.xpsnr_y:.5f}\033[0m")
-    print(f" XPSNR U:       \033[1m{dst.xpsnr_u:.5f}\033[0m")
-    print(f" XPSNR V:       \033[1m{dst.xpsnr_v:.5f}\033[0m")
-    print(f" W-XPSNR:       \033[1m{dst.w_xpsnr:.5f}\033[0m")
-
-    # Write scores to CSV
-    if csv:
-        dst.write_csvs()
+    dst.print_butteraugli()
 
 
 if __name__ == "__main__":
