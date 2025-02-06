@@ -18,8 +18,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run metrics given a source video & a distorted video."
     )
-    parser.add_argument("source", help="Source video path")
-    parser.add_argument("distorted", help="Distorted video path")
+    parser.add_argument("source", help="Source video path", required=True)
+    parser.add_argument("distorted", help="Distorted video path", required=True)
     parser.add_argument(
         "-e",
         "--every",

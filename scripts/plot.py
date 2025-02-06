@@ -137,7 +137,6 @@ def main():
     parser.add_argument(
         "-f",
         "--format",
-        required=False,
         default="svg",
         type=str,
         help="Save the plot as 'svg', 'png', or 'webp'",

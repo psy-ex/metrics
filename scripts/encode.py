@@ -31,6 +31,7 @@ def main():
     parser.add_argument(
         "encoder",
         choices=["x264", "x265", "svtav1", "aomenc"],
+        required=True,
         type=str,
         help="Which video encoder to use",
     )
