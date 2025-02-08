@@ -4,15 +4,21 @@
 # dependencies = [
 #     "argparse>=1.4.0",
 #     "matplotlib>=3.10.0",
+#     "numpy>=2.2.2",
+#     "scipy>=1.15.1",
 # ]
 # ///
 
 import argparse
 import csv
+import math
 import os
 from argparse import Namespace
 
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.integrate import simpson
+from scipy.interpolate import pchip_interpolate
 
 
 def read_csv(filename):
@@ -122,6 +128,57 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
     plt.close()
 
 
+def bd_rate_simpson(metric_set1, metric_set2):
+    """
+    Calculate BD-rate (Bjontegaard Delta Rate) difference between two rate-distortion curves,
+    using a Piecewise Cubic Hermite Interpolating Polynomial (PCHIP) and Simpson integration.
+
+    Each metric_set is a list of tuples (bitrate, metric_value). The bitrate is first logged.
+    The function computes the average percentage difference in bitrate over the overlapping interval
+    of the metric curves.
+
+    Returns BD-rate % as a float.
+    """
+    if not metric_set1 or not metric_set2:
+        return 0.0
+    try:
+        # Sort each metric set by metric value.
+        metric_set1.sort(key=lambda tup: tup[1])
+        metric_set2.sort(key=lambda tup: tup[1])
+
+        # For each set, take the logarithm of bitrate values and fix any infinite metric values.
+        log_rate1 = [math.log(x[0]) for x in metric_set1]
+        metric1 = [100.0 if x[1] == float("inf") else x[1] for x in metric_set1]
+        log_rate2 = [math.log(x[0]) for x in metric_set2]
+        metric2 = [100.0 if x[1] == float("inf") else x[1] for x in metric_set2]
+
+        # Define the overlapping integration interval on the metric axis.
+        min_int = max(min(metric1), min(metric2))
+        max_int = min(max(metric1), max(metric2))
+        if max_int <= min_int:
+            return 0.0
+
+        # Create 100 sample points between min_int and max_int.
+        samples, interval = np.linspace(min_int, max_int, num=100, retstep=True)
+
+        # Interpolate the log-rate values at the sample metric values.
+        v1 = pchip_interpolate(metric1, log_rate1, samples)
+        v2 = pchip_interpolate(metric2, log_rate2, samples)
+
+        # Integrate the curves using Simpson's rule.
+        int_v1 = simpson(v1, dx=interval)
+        int_v2 = simpson(v2, dx=interval)
+
+        # Compute the average difference in the log domain.
+        avg_exp_diff = (int_v2 - int_v1) / (max_int - min_int)
+    except (TypeError, ZeroDivisionError, ValueError):
+        return 0.0
+
+    # Convert the averaged log difference back to a percentage difference.
+    bd_rate_percent = (math.exp(avg_exp_diff) - 1) * 100
+    return bd_rate_percent
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Plot codec metrics from one or more CSV files (one per codec) for side-by-side comparison."
@@ -156,6 +213,30 @@ def main():
     metrics = ["ssimu2_hmean", "butter_distance", "wxpsnr"]
     for metric in metrics:
         create_metric_plot(datasets, metric, fmt)
+
+    # If there are at least two datasets, compute and print the BD-rate for each metric.
+    if len(datasets) >= 2:
+        metric_labels = {
+            "ssimu2_hmean":    "\033[94mSSIMULACRA2\033[0m Harmonic Mean: ",
+            "butter_distance": "\033[93mButteraugli\033[0m Distance:      ",
+            "wxpsnr":          "W-\033[91mXPSNR\033[0m:                   ",
+        }
+        print(
+            "BD-rate values between '{}' & '{}'".format(
+                datasets[0][0], datasets[1][0]
+            )
+        )
+        for metric in metrics:
+            # Create lists of tuples (output_filesize, metric_value) from the first two datasets.
+            data1 = datasets[0][1]
+            data2 = datasets[1][1]
+            metric_set1 = list(zip(data1["output_filesize"], data1[metric]))
+            metric_set2 = list(zip(data2["output_filesize"], data2[metric]))
+
+            bd_rate = bd_rate_simpson(metric_set1, metric_set2)
+            print(f"{metric_labels.get(metric, metric)}\033[1m{bd_rate:2.2f}%\033[0m")
+    else:
+        print("Need at least two CSV files to compute BD-rate values.")
 
 
 if __name__ == "__main__":
