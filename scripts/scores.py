@@ -59,7 +59,7 @@ def main() -> None:
     # Calculate XPSNR scores
     print("Running \033[91mXPSNR\033[0m ...")
     dst.calculate_xpsnr(src)
-    dst.print_butteraugli()
+    dst.print_xpsnr()
 
 
 if __name__ == "__main__":
