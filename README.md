@@ -84,17 +84,19 @@ chmod a+x stats.py scores.py plot.py encode.py
 
 ```bash
 % ./scores.py --help
-usage: scores.py [-h] [-e EVERY] [-c] [-b] source distorted
+usage: scores.py [-h] [-e EVERY] [-g GPU_THREADS] source distorted
 
 Run metrics given a source video & a distorted video.
 
 positional arguments:
-  source             Source video path
-  distorted          Distorted video path
+  source                Source video path
+  distorted             Distorted video path
 
 options:
-  -h, --help         show this help message and exit
-  -e, --every EVERY  Only score every nth frame. Default 1 (every frame)
+  -h, --help            show this help message and exit
+  -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
+  -g, --gpu-threads GPU_THREADS
+                        Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads
 ```
 
 Example:
@@ -110,17 +112,14 @@ every 3rd frame.
 
 ```bash
 % ./encode.py --help
-usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-n]
-                 {x264,x265,svtav1,aomenc} ...
+usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-g GPU_THREADS] [-n] {x264,x265,svtav1,aomenc} ...
 
-Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video
-encodes.
+Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
 
 positional arguments:
   {x264,x265,svtav1,aomenc}
                         Which video encoder to use
-  encoder_args          Additional encoder arguments (pass these after a '--'
-                        delimiter)
+  encoder_args          Additional encoder arguments (pass these after a '--' delimiter)
 
 options:
   -h, --help            show this help message and exit
@@ -129,6 +128,8 @@ options:
                         Desired CRF value for the encoder
   -b, --keep KEEP       Output video file name
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
+  -g, --gpu-threads GPU_THREADS
+                        Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads
   -n, --no-metrics      Skip metrics calculations
 ```
 
@@ -144,18 +145,14 @@ with the `--preset 2` argument. It will print metrics after encoding.
 ### stats.py
 
 ```bash
-./stats.py --help
-usage: stats.py [-h] -i INPUT -q QUALITY -o OUTPUT [-e EVERY] [-k]
-                {x264,x265,svtav1,aomenc} ...
+usage: stats.py [-h] -i INPUT -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_THREADS] [-k] {x264,x265,svtav1,aomenc} ...
 
-Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video
-encodes.
+Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
 
 positional arguments:
   {x264,x265,svtav1,aomenc}
                         Which video encoder to use
-  encoder_args          Additional encoder arguments (pass these after a '--'
-                        delimiter)
+  encoder_args          Additional encoder arguments (pass these after a '--' delimiter)
 
 options:
   -h, --help            show this help message and exit
@@ -164,6 +161,8 @@ options:
                         List of quality values to test (e.g. 20 30 40 50)
   -o, --output OUTPUT   Path to output CSV file
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
+  -g, --gpu-threads GPU_THREADS
+                        Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads
   -k, --keep            Keep output video files
 ```
 
@@ -224,6 +223,8 @@ Example:
 This command reads `codec1_results.csv` and `codec2_results.csv`, generating
 separate plots (one for each metric: SSIMULACRA2, Butteraugli, and XPSNR) as
 WebP images.
+
+It will also print BD-rate statistics for each metric, comparing the two results from the CSV files.
 
 ## License
 
