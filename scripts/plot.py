@@ -217,14 +217,12 @@ def main():
     # If there are at least two datasets, compute and print the BD-rate for each metric.
     if len(datasets) >= 2:
         metric_labels = {
-            "ssimu2_hmean":    " \033[94mSSIMULACRA2\033[0m Harmonic Mean: ",
+            "ssimu2_hmean": " \033[94mSSIMULACRA2\033[0m Harmonic Mean: ",
             "butter_distance": " \033[93mButteraugli\033[0m Distance:      ",
-            "wxpsnr":          " W-\033[91mXPSNR\033[0m:                   ",
+            "wxpsnr": " W-\033[91mXPSNR\033[0m:                   ",
         }
         print(
-            "BD-rate values between '{}' & '{}'".format(
-                datasets[0][0], datasets[1][0]
-            )
+            "BD-rate values between '{}' & '{}'".format(datasets[0][0], datasets[1][0])
         )
         for metric in metrics:
             # Create lists of tuples (output_filesize, metric_value) from the first two datasets.
@@ -234,7 +232,9 @@ def main():
             metric_set2 = list(zip(data2["output_filesize"], data2[metric]))
 
             bd_rate = bd_rate_simpson(metric_set1, metric_set2)
-            print(f"{metric_labels.get(metric, metric)}\033[1m{bd_rate:7.2f}%\033[0m {"{} is better".format(datasets[1][0]) if bd_rate < 0 else "{} is better".format(datasets[0][0])}")
+            print(
+                f"{metric_labels.get(metric, metric)}\033[1m{bd_rate:7.2f}%\033[0m {'{} is better'.format(datasets[1][0]) if bd_rate < 0 else '{} is better'.format(datasets[0][0])}"
+            )
     else:
         print("Need at least two CSV files to compute BD-rate values.")
 
