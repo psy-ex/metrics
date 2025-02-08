@@ -6,6 +6,7 @@
 #     "statistics>=1.0.3.5",
 #     "tqdm>=4.67.1",
 #     "vapoursynth>=70",
+#     "vstools>=3.3.4",
 # ]
 # ///
 
@@ -27,12 +28,20 @@ def main() -> None:
         default=1,
         help="Only score every nth frame. Default 1 (every frame)",
     )
+    parser.add_argument(
+        "-g",
+        "--gpu-threads",
+        type=int,
+        default=0,
+        help="Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads",
+    )
 
     args: Namespace = parser.parse_args()
     every: int = args.every
+    gpu_threads: int = args.gpu_threads
 
-    src: CoreVideo = CoreVideo(args.source, every)
-    dst: DstVideo = DstVideo(args.distorted, every)
+    src: CoreVideo = CoreVideo(args.source, every, gpu_threads)
+    dst: DstVideo = DstVideo(args.distorted, every, gpu_threads)
 
     print(f"Source video:    \033[4m{src.name}\033[0m")
     print(f"Distorted video: \033[4m{dst.name}\033[0m")

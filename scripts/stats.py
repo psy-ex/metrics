@@ -6,6 +6,7 @@
 #     "statistics>=1.0.3.5",
 #     "tqdm>=4.67.1",
 #     "vapoursynth>=70",
+#     "vstools>=3.3.4",
 # ]
 # ///
 
@@ -65,6 +66,13 @@ def main():
         help="Only score every nth frame. Default 1 (every frame)",
     )
     parser.add_argument(
+        "-g",
+        "--gpu-threads",
+        type=int,
+        default=0,
+        help="Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads",
+    )
+    parser.add_argument(
         "-k",
         "--keep",
         default=True,
@@ -84,10 +92,11 @@ def main():
     enc: str = args.encoder
     csv_out: str = args.output
     every: int = args.every
+    gpu_threads: int = args.gpu_threads
     clean: bool = args.keep
     enc_args: list[str] = args.encoder_args
 
-    s: CoreVideo = CoreVideo(src_pth, every)
+    s: CoreVideo = CoreVideo(src_pth, every, gpu_threads)
     print(f"Source video: {s.name}")
 
     print(f"Running encoder at qualities: {quality_list}")
@@ -95,7 +104,7 @@ def main():
         print(f"Quality: {q}")
 
         e: VideoEnc = VideoEnc(s, q, enc, enc_args)
-        v: DstVideo = e.encode(every)
+        v: DstVideo = e.encode(every, gpu_threads)
         print(f"Encoded video: {e.dst_pth}")
 
         v.calculate_ssimulacra2(s)

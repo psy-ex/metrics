@@ -6,6 +6,7 @@
 #     "statistics>=1.0.3.5",
 #     "tqdm>=4.67.1",
 #     "vapoursynth>=70",
+#     "vstools>=3.3.4",
 # ]
 # ///
 
@@ -49,6 +50,13 @@ def main():
         help="Additional encoder arguments (pass these after a '--' delimiter)",
     )
     parser.add_argument(
+        "-g",
+        "--gpu-threads",
+        type=int,
+        default=0,
+        help="Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads",
+    )
+    parser.add_argument(
         "-n", "--no-metrics", action="store_true", help="Skip metrics calculations"
     )
 
@@ -59,9 +67,10 @@ def main():
     enc: str = args.encoder
     every: int = args.every
     enc_args: list[str] = args.encoder_args
+    gpu_threads: int = args.gpu_threads
     run_metrics: bool = not args.no_metrics
 
-    s: CoreVideo = CoreVideo(src_pth, every)
+    s: CoreVideo = CoreVideo(src_pth, every, gpu_threads)
     print(f"Source video: {s.name}")
 
     print(f"Running encoder at Q{q}")
@@ -69,7 +78,7 @@ def main():
         e: VideoEnc = VideoEnc(s, q, enc, enc_args, dst_pth)
     else:
         e: VideoEnc = VideoEnc(s, q, enc, enc_args)
-    v: DstVideo = e.encode(every)
+    v: DstVideo = e.encode(every, gpu_threads)
     print(f"Encoded video: {e.dst_pth}")
 
     if run_metrics:

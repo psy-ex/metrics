@@ -8,6 +8,7 @@ from subprocess import Popen
 import vapoursynth as vs
 from tqdm import tqdm
 from vapoursynth import VideoNode
+from vstools import initialize_clip
 
 
 class CoreVideo:
@@ -19,6 +20,7 @@ class CoreVideo:
     name: str
     size: int
     e: int
+    gpu_threads: int
 
     video_width: int
     video_height: int
@@ -26,11 +28,12 @@ class CoreVideo:
     # VapourSynth video object
     video: VideoNode
 
-    def __init__(self, pth: str, e: int) -> None:
+    def __init__(self, pth: str, e: int, g: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
         self.e = e
+        self.gpu_threads = g
         self.video = self.vapoursynth_init()
 
     def get_input_filesize(self) -> int:
@@ -44,8 +47,17 @@ class CoreVideo:
         Initialize VapourSynth video object for the distorted video.
         """
         core = vs.core
+        if self.gpu_threads:
+            print(
+                f"Using {self.gpu_threads} GPU threads for SSIMULACRA2 & Butteraugli."
+            )
+            print(
+                "⚠️ Warning: GPU support is experimental, and results may differ from those produced using the CPU."
+            )
+            core.num_threads = self.gpu_threads
         video = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
-        video = video.resize.Bicubic(format=vs.RGBS, matrix_in_s="709")
+        video = initialize_clip(video, bits=0)
+        video = video.resize.Bicubic(format=vs.RGBS)
         if self.e > 1:
             video = video.std.SelectEvery(cycle=self.e, offsets=0)
         return video
@@ -80,12 +92,13 @@ class DstVideo(CoreVideo):
     xpsnr_v: float
     w_xpsnr: float
 
-    def __init__(self, pth: str, e: int) -> None:
+    def __init__(self, pth: str, e: int, g: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
         self.e = e
         self.video_width, self.video_height = self.get_video_dimensions()
+        self.gpu_threads = g
         self.video = self.vapoursynth_init()
         self.ssimu2_avg = 0.0
         self.ssimu2_hmn = 0.0
@@ -103,7 +116,10 @@ class DstVideo(CoreVideo):
         Calculate SSIMULACRA2 score between a source video & a distorted video.
         """
 
-        ssimu2_obj = src.video.vszip.Metrics(self.video, [0])
+        if self.gpu_threads:
+            ssimu2_obj = src.video.vship.SSIMULACRA2(self.video)
+        else:
+            ssimu2_obj = src.video.vszip.Metrics(self.video, [0])
 
         ssimu2_list: list[float] = []
         with tqdm(
@@ -135,7 +151,10 @@ class DstVideo(CoreVideo):
         Calculate Butteraugli score between a source video & a distorted video.
         """
 
-        butter_obj = src.video.julek.Butteraugli(self.video, [0])
+        if self.gpu_threads:
+            butter_obj = src.video.vship.BUTTERAUGLI(self.video)
+        else:
+            butter_obj = src.video.julek.Butteraugli(self.video, [0])
 
         butter_distance_list: list[float] = []
         with tqdm(
@@ -145,7 +164,11 @@ class DstVideo(CoreVideo):
             colour="yellow",
         ) as pbar:
             for i, f in enumerate(butter_obj.frames()):
-                d: float = f.props["_FrameButteraugli"]
+                d: float = (
+                    f.props["_FrameButteraugli"]
+                    if not self.gpu_threads
+                    else f.props["_BUTTERAUGLI_INFNorm"]
+                )
                 butter_distance_list.append(d)
                 pbar.update(1)
                 if not i % 24:
@@ -285,7 +308,7 @@ class VideoEnc:
         print(" ".join(cmd))
         return cmd
 
-    def encode(self, e: int) -> DstVideo:
+    def encode(self, e: int, g: int) -> DstVideo:
         """
         Encode the video using FFmpeg piped to your chosen encoder.
         """
@@ -320,7 +343,7 @@ class VideoEnc:
         )
         _, stderr = enc_proc.communicate()
         print(stderr)
-        return DstVideo(self.dst_pth, e)
+        return DstVideo(self.dst_pth, e, g)
 
     def remove_output(self) -> None:
         """

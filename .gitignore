@@ -179,3 +179,4 @@ uv.lock
 *.csv
 *.ivf
 *.png
+*.sh

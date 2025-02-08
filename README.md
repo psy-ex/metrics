@@ -52,6 +52,7 @@ PSY-EX Metrics enables you to:
   - ffms2
   - [vszip](https://github.com/dnjulek/vapoursynth-zip)
   - [julek](https://github.com/dnjulek/vapoursynth-julek-plugin)
+  - [vship](https://github.com/Line-fr/Vship) [Optional: provides GPU support]
 
 ### Install Steps
 
