@@ -224,7 +224,8 @@ This command reads `codec1_results.csv` and `codec2_results.csv`, generating
 separate plots (one for each metric: SSIMULACRA2, Butteraugli, and XPSNR) as
 WebP images.
 
-It will also print BD-rate statistics for each metric, comparing the two results from the CSV files.
+It will also print BD-rate statistics for each metric, comparing the two results
+from the CSV files.
 
 ## License
 
