@@ -180,3 +180,4 @@ uv.lock
 *.ivf
 *.png
 *.sh
+scripts/*.svg
