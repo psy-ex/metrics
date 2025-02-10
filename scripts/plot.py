@@ -217,24 +217,41 @@ def main():
     # If there are at least two datasets, compute and print the BD-rate for each metric.
     if len(datasets) >= 2:
         metric_labels = {
-            "ssimu2_hmean": " \033[94mSSIMULACRA2\033[0m Harmonic Mean: ",
-            "butter_distance": " \033[93mButteraugli\033[0m Distance:      ",
-            "wxpsnr": " W-\033[91mXPSNR\033[0m:                   ",
+            "ssimu2_hmean": "\033[94mSSIMULACRA2\033[0m Harmonic Mean: ",
+            "butter_distance": "\033[93mButteraugli\033[0m Distance:      ",
+            "wxpsnr": "W-\033[91mXPSNR\033[0m:                   ",
         }
-        print(
-            "BD-rate values between '{}' & '{}'".format(datasets[0][0], datasets[1][0])
-        )
-        for metric in metrics:
-            # Create lists of tuples (output_filesize, metric_value) from the first two datasets.
-            data1 = datasets[0][1]
-            data2 = datasets[1][1]
-            metric_set1 = list(zip(data1["output_filesize"], data1[metric]))
-            metric_set2 = list(zip(data2["output_filesize"], data2[metric]))
 
-            bd_rate = bd_rate_simpson(metric_set1, metric_set2)
+        # Compare the first CSV file with each of the other CSV files.
+        for idx in range(1, len(datasets)):
+            file1_label = datasets[0][0]
+            filecmp_label = datasets[idx][0]
             print(
-                f"{metric_labels.get(metric, metric)}\033[1m{bd_rate:7.2f}%\033[0m {'{} is better'.format(datasets[1][0]) if bd_rate < 0 else '{} is better'.format(datasets[0][0])}"
+                "BD-rate values between '{}' & '{}'".format(file1_label, filecmp_label)
             )
+            for metric in metrics:
+                # Create lists of tuples (output_filesize, metric_value) for the two files.
+                data1 = datasets[0][1]
+                data2 = datasets[idx][1]
+                metric_set1 = list(zip(data1["output_filesize"], data1[metric]))
+                metric_set2 = list(zip(data2["output_filesize"], data2[metric]))
+
+                bd_rate = bd_rate_simpson(metric_set1, metric_set2)
+                # Decide which file is better based on the sign of the bd_rate value.
+                if bd_rate < 0:
+                    # Negative BD-rate indicates that the second file (the one it is compared with)
+                    # is better (i.e., lower bitrate for the same quality).
+                    winner_msg = f"{filecmp_label} is better"
+                elif bd_rate > 0:
+                    winner_msg = f"{file1_label} is better"
+                else:
+                    winner_msg = "No difference"
+
+                print(
+                    f"{metric_labels.get(metric, metric)}\033[1m{bd_rate:7.2f}%\033[0m -> {winner_msg}"
+                )
+            if idx < len(datasets) - 1:
+                print()  # Empty line for readability
     else:
         print("Need at least two CSV files to compute BD-rate values.")
 
