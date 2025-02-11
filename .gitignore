@@ -178,6 +178,8 @@ uv.lock
 # Project-specific
 *.csv
 *.ivf
+*.265
+*.264
 *.png
 *.sh
 scripts/*.svg

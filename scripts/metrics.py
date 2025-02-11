@@ -35,6 +35,7 @@ class CoreVideo:
         self.e = e
         self.gpu_threads = g
         self.video = self.vapoursynth_init()
+        self.video_width, self.video_height = self.get_video_dimensions()
 
     def get_input_filesize(self) -> int:
         """
@@ -291,18 +292,45 @@ class VideoEnc:
     def set_enc_cmd(self) -> list[str]:
         p: str = os.path.splitext(os.path.basename(self.src.path))[0]
         if not self.dst_pth:
-            self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
+            if self.encoder == "svtav1":
+                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
+            elif self.encoder == "x265":
+                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.265"
+            else:
+                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.264"
         print(f"Selected encoder: {self.encoder}")
         print(f"Encoding {self.src.path} to {self.dst_pth} ...")
-        cmd: list[str] = [
-            "SvtAv1EncApp",
-            "-i",
-            "-",
-            "-b",
-            f"{self.dst_pth}",
-            "--crf",
-            f"{self.q}",
-        ]
+        if self.encoder == "svtav1":
+            cmd: list[str] = [
+                "SvtAv1EncApp",
+                "-i",
+                "-",
+                "-b",
+                f"{self.dst_pth}",
+                "--crf",
+                f"{self.q}",
+            ]
+        elif self.encoder == "x265":
+            cmd: list[str] = [
+                "x265",
+                "--y4m",
+                "-",
+                "--crf",
+                f"{self.q}",
+                "-o",
+                f"{self.dst_pth}"
+            ]
+        else:
+            cmd: list[str] = [
+                "x264",
+                "--demuxer",
+                "y4m",
+                "--crf",
+                f"{self.q}",
+                "-o",
+                f"{self.dst_pth}",
+                "-",
+            ]
         if self.encoder_args != [""]:
             cmd.extend(self.encoder_args)
         print(" ".join(cmd))
