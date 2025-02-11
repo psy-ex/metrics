@@ -98,7 +98,7 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
         spine.set_color("grey")
 
     # Set labels.
-    plt.xlabel("Output Filesize (KB)", color="gainsboro", family="monospace")
+    plt.xlabel("Output Filesize (MB)", color="gainsboro", family="monospace")
     metric_labels = {
         "ssimu2_hmean": "SSIMULACRA2 Harmonic Mean",
         "butter_distance": "Butteraugli Distance",
