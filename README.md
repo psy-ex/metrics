@@ -32,7 +32,6 @@ Read more below on how to install and use these utilities.
 PSY-EX Metrics enables you to:
 
 - Encode videos using various codecs (e.g., x264, x265, svtav1, aomenc).
-  - (Currently, only SVT-AV1 is supported)
 - Calculate visual quality & distance metrics, such as:
   - SSIMULACRA2
   - Butteraugli
