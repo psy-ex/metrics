@@ -52,9 +52,6 @@ class CoreVideo:
             print(
                 f"Using {self.gpu_threads} GPU threads for SSIMULACRA2 & Butteraugli."
             )
-            print(
-                "⚠️ Warning: GPU support is experimental, and results may differ from those produced using the CPU."
-            )
             core.num_threads = self.gpu_threads
         video = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
         video = initialize_clip(video, bits=0)
@@ -324,7 +321,7 @@ class VideoEnc:
                 "-y",
                 "-",
                 "-o",
-                f"{self.dst_pth}"
+                f"{self.dst_pth}",
             ]
         elif self.encoder == "x265":
             cmd: list[str] = [
@@ -334,7 +331,7 @@ class VideoEnc:
                 "--crf",
                 f"{self.q}",
                 "-o",
-                f"{self.dst_pth}"
+                f"{self.dst_pth}",
             ]
         elif self.encoder == "vvenc":
             cmd: list[str] = [
@@ -345,7 +342,7 @@ class VideoEnc:
                 "--qp",
                 f"{self.q}",
                 "-o",
-                f"{self.dst_pth}"
+                f"{self.dst_pth}",
             ]
         else:
             cmd: list[str] = [

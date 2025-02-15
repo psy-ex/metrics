@@ -72,7 +72,7 @@ cd scripts/
 chmod a+x stats.py scores.py plot.py encode.py
 ```
 
-3. Run a script
+3. Run a script, no Python package installation required
 
 ```bash
 ./scores.py source.mkv distorted.mkv
@@ -133,14 +133,21 @@ options:
   -n, --no-metrics      Skip metrics calculations
 ```
 
-Example:
+Examples:
 
 ```bash
 ./encode.py -i source.mkv --keep video.ivf -q 29 svtav1 -- --preset 2
 ```
 
-This command encodes `tennis_sif.m4v` at a CRF of 29 using the SVT-AV1 encoder
-with the `--preset 2` argument. It will print metrics after encoding.
+This command encodes `source.mkv` at a CRF of 29 using the SVT-AV1 encoder with
+the `--preset 2` argument. It will print metrics after encoding.
+
+```bash
+./encode.py -i source.mkv --keep video.ivf -q 29 -g 4 svtav1 -- --preset 8
+```
+
+This command does the same as the previous command, but uses 4 GPU threads
+instead of the CPU as well as passing a higher preset value to SVT-AV1.
 
 ### stats.py
 
