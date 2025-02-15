@@ -294,7 +294,9 @@ class VideoEnc:
         if not self.dst_pth:
             if self.encoder == "svtav1":
                 self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
-            if self.encoder == "vvenc":
+            elif self.encoder == "aomenc":
+                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
+            elif self.encoder == "vvenc":
                 self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.266"
             elif self.encoder == "x265":
                 self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.265"
@@ -311,6 +313,18 @@ class VideoEnc:
                 f"{self.dst_pth}",
                 "--crf",
                 f"{self.q}",
+            ]
+        elif self.encoder == "aomenc":
+            cmd: list[str] = [
+                "aomenc",
+                "--ivf",
+                "--end-usage=q",
+                f"--cq-level={self.q}",
+                "--passes=1",
+                "-y",
+                "-",
+                "-o",
+                f"{self.dst_pth}"
             ]
         elif self.encoder == "x265":
             cmd: list[str] = [
