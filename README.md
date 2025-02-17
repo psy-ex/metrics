@@ -151,7 +151,7 @@ instead of the CPU as well as passing a higher preset value to SVT-AV1.
 ### stats.py
 
 ```bash
-usage: stats.py [-h] -i INPUT -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_THREADS] [-k] {x264,x265,svtav1,aomenc} ...
+usage: stats.py [-h] -i INPUTS [INPUTS ...] -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_THREADS] [-k] {x264,x265,svtav1,aomenc} ...
 
 Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
 
@@ -162,7 +162,8 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  -i, --input INPUT     Path to source video file
+  -i, --inputs INPUTS [INPUTS ...]
+                        Path(s) to source video file(s)
   -q, --quality QUALITY
                         List of quality values to test (e.g. 20 30 40 50)
   -o, --output OUTPUT   Path to output CSV file
@@ -194,7 +195,7 @@ You can also script this to run across multiple speed presets:
 
 for speed in {2..6}; do
   ./stats.py \
-  -i ~/Videos/reference/foodmarket-nf-1080.y4m \
+  -i ~/Videos/reference/*.y4m \
   -q "20 25 30 35 40" \
   -o ./svtav1_2.3.0-B_p${speed}.csv \
   -e 3 \
@@ -203,7 +204,8 @@ done
 ```
 
 This snippet here will run the same command as before, but across all speed
-presets from 2 to 6 (naming the output CSV files accordingly).
+presets from 2 to 6 (naming the output CSV files accordingly). It will also
+encode all of the files ending in `.y4m` in the `~/Videos/reference` directory.
 
 ### plot.py
 
