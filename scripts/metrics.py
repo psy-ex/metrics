@@ -20,7 +20,8 @@ class CoreVideo:
     name: str
     size: int
     e: int
-    gpu_threads: int
+    threads: int
+    gpu: bool
 
     video_width: int
     video_height: int
@@ -28,12 +29,13 @@ class CoreVideo:
     # VapourSynth video object
     video: VideoNode
 
-    def __init__(self, pth: str, e: int, g: int) -> None:
+    def __init__(self, pth: str, e: int, t: int, g: bool) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
         self.e = e
-        self.gpu_threads = g
+        self.threads = t
+        self.gpu = g
         self.video = self.vapoursynth_init()
         self.video_width, self.video_height = self.get_video_dimensions()
 
@@ -48,12 +50,11 @@ class CoreVideo:
         Initialize VapourSynth video object for the distorted video.
         """
         core = vs.core
-        if self.gpu_threads:
-            print(
-                f"Using {self.gpu_threads} GPU threads for SSIMULACRA2 & Butteraugli."
-            )
-            core.num_threads = self.gpu_threads
-        video = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
+        print(
+            f"Using {self.threads} {"GPU" if self.gpu else "CPU"} threads for SSIMULACRA2 & Butteraugli."
+        )
+        core.num_threads = self.threads
+        video = core.ffms2.Source(source=self.path, cache=False, threads=self.threads)
         video = initialize_clip(video, bits=0)
         video = video.resize.Bicubic(format=vs.RGBS)
         if self.e > 1:
@@ -90,13 +91,14 @@ class DstVideo(CoreVideo):
     xpsnr_v: float
     w_xpsnr: float
 
-    def __init__(self, pth: str, e: int, g: int) -> None:
+    def __init__(self, pth: str, e: int, t: int, g: bool) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
         self.e = e
         self.video_width, self.video_height = self.get_video_dimensions()
-        self.gpu_threads = g
+        self.threads = t
+        self.gpu = g
         self.video = self.vapoursynth_init()
         self.ssimu2_avg = 0.0
         self.ssimu2_hmn = 0.0
@@ -114,7 +116,7 @@ class DstVideo(CoreVideo):
         Calculate SSIMULACRA2 score between a source video & a distorted video.
         """
 
-        if self.gpu_threads:
+        if self.gpu:
             ssimu2_obj = src.video.vship.SSIMULACRA2(self.video)
         else:
             ssimu2_obj = src.video.vszip.Metrics(self.video, [0])
@@ -149,7 +151,7 @@ class DstVideo(CoreVideo):
         Calculate Butteraugli score between a source video & a distorted video.
         """
 
-        if self.gpu_threads:
+        if self.gpu:
             butter_obj = src.video.vship.BUTTERAUGLI(self.video)
         else:
             butter_obj = src.video.julek.Butteraugli(self.video, [0])
@@ -164,7 +166,7 @@ class DstVideo(CoreVideo):
             for i, f in enumerate(butter_obj.frames()):
                 d: float = (
                     f.props["_FrameButteraugli"]
-                    if not self.gpu_threads
+                    if not self.gpu
                     else f.props["_BUTTERAUGLI_INFNorm"]
                 )
                 butter_distance_list.append(d)
@@ -360,7 +362,7 @@ class VideoEnc:
         print(" ".join(cmd))
         return cmd
 
-    def encode(self, e: int, g: int) -> DstVideo:
+    def encode(self, e: int, t: int, g: bool) -> DstVideo:
         """
         Encode the video using FFmpeg piped to your chosen encoder.
         """
@@ -395,7 +397,7 @@ class VideoEnc:
         )
         _, stderr = enc_proc.communicate()
         print(stderr)
-        return DstVideo(self.dst_pth, e, g)
+        return DstVideo(self.dst_pth, e, t, g)
 
     def remove_output(self) -> None:
         """

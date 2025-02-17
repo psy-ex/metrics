@@ -83,7 +83,14 @@ def main():
         "--gpu-threads",
         type=int,
         default=0,
-        help="Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads",
+        help="Number of GPU threads for SSIMULACRA2 & Butteraugli",
+    )
+    parser.add_argument(
+        "-c",
+        "--cpu-threads",
+        type=int,
+        default=0,
+        help="Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)",
     )
     parser.add_argument(
         "-k",
@@ -105,7 +112,8 @@ def main():
     enc: str = args.encoder
     csv_out: str = args.output
     every: int = args.every
-    gpu_threads: int = args.gpu_threads
+    threads: int = args.gpu_threads if args.gpu_threads else args.cpu_threads
+    use_gpu: bool = args.gpu_threads > 0
     clean: bool = args.keep
     enc_args: list[str] = args.encoder_args
 
@@ -124,7 +132,7 @@ def main():
     i: int = 0
 
     for src in src_pth:
-        s: CoreVideo = CoreVideo(src, every, gpu_threads)
+        s: CoreVideo = CoreVideo(src, every, threads, use_gpu)
         print(f"Source video: {s.name}")
 
         print(f"Running encoder at qualities: {quality_list}")
@@ -132,7 +140,7 @@ def main():
             print(f"Quality: {q}")
 
             e: VideoEnc = VideoEnc(s, q, enc, enc_args)
-            v: DstVideo = e.encode(every, gpu_threads)
+            v: DstVideo = e.encode(every, threads, use_gpu)
             print(f"Encoded video: {e.dst_pth}")
 
             v.calculate_ssimulacra2(s)

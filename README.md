@@ -83,7 +83,7 @@ chmod a+x stats.py scores.py plot.py encode.py
 
 ```bash
 % ./scores.py --help
-usage: scores.py [-h] [-e EVERY] [-g GPU_THREADS] source distorted
+usage: scores.py [-h] [-e EVERY] [-g GPU_THREADS] [-c CPU_THREADS] source distorted
 
 Run metrics given a source video & a distorted video.
 
@@ -95,7 +95,9 @@ options:
   -h, --help            show this help message and exit
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
   -g, --gpu-threads GPU_THREADS
-                        Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads
+                        Number of GPU threads for SSIMULACRA2 & Butteraugli
+  -c, --cpu-threads CPU_THREADS
+                        Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)
 ```
 
 Example:
@@ -111,7 +113,7 @@ every 3rd frame.
 
 ```bash
 % ./encode.py --help
-usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-g GPU_THREADS] [-n] {x264,x265,svtav1,aomenc} ...
+usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-g GPU_THREADS] [-c CPU_THREADS] [-n] {x264,x265,svtav1,aomenc} ...
 
 Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
 
@@ -128,7 +130,9 @@ options:
   -b, --keep KEEP       Output video file name
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
   -g, --gpu-threads GPU_THREADS
-                        Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads
+                        Number of GPU threads for SSIMULACRA2 & Butteraugli
+  -c, --cpu-threads CPU_THREADS
+                        Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)
   -n, --no-metrics      Skip metrics calculations
 ```
 
@@ -151,7 +155,7 @@ instead of the CPU as well as passing a higher preset value to SVT-AV1.
 ### stats.py
 
 ```bash
-usage: stats.py [-h] -i INPUTS [INPUTS ...] -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_THREADS] [-k] {x264,x265,svtav1,aomenc} ...
+usage: stats.py [-h] -i INPUTS [INPUTS ...] -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_THREADS] [-c CPU_THREADS] [-k] {x264,x265,svtav1,aomenc} ...
 
 Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
 
@@ -169,7 +173,9 @@ options:
   -o, --output OUTPUT   Path to output CSV file
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
   -g, --gpu-threads GPU_THREADS
-                        Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads
+                        Number of GPU threads for SSIMULACRA2 & Butteraugli
+  -c, --cpu-threads CPU_THREADS
+                        Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)
   -k, --keep            Keep output video files
 ```
 

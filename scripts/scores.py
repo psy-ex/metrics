@@ -33,15 +33,23 @@ def main() -> None:
         "--gpu-threads",
         type=int,
         default=0,
-        help="Perform SSIMULACRA2 & Butteraugli calculations on the GPU with this many threads",
+        help="Number of GPU threads for SSIMULACRA2 & Butteraugli",
+    )
+    parser.add_argument(
+        "-c",
+        "--cpu-threads",
+        type=int,
+        default=0,
+        help="Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)",
     )
 
     args: Namespace = parser.parse_args()
     every: int = args.every
-    gpu_threads: int = args.gpu_threads
+    threads: int = args.gpu_threads if args.gpu_threads else args.cpu_threads
+    use_gpu: bool = args.gpu_threads > 0
 
-    src: CoreVideo = CoreVideo(args.source, every, gpu_threads)
-    dst: DstVideo = DstVideo(args.distorted, every, gpu_threads)
+    src: CoreVideo = CoreVideo(args.source, every, threads, use_gpu)
+    dst: DstVideo = DstVideo(args.distorted, every, threads, use_gpu)
 
     print(f"Source video:    \033[4m{src.name}\033[0m")
     print(f"Distorted video: \033[4m{dst.name}\033[0m")

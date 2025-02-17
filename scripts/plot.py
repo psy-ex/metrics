@@ -60,11 +60,11 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
     # For each metric, define a colormap so that multiple CSV files
     # use different shades of the same base hue.
     colormaps = {
-        "ssimu2_hmean": plt.cm.Blues,
-        "butter_distance": plt.cm.YlOrBr,
-        "wxpsnr": plt.cm.Reds,
+        "ssimu2_hmean": plt.colormaps.get_cmap("Blues"),
+        "butter_distance": plt.colormaps.get_cmap("YlOrBr"),
+        "wxpsnr": plt.colormaps.get_cmap("Reds"),
     }
-    cmap = colormaps.get(metric_name, plt.cm.viridis)
+    cmap = colormaps.get(metric_name, plt.colormaps.get_cmap("viridis"))
 
     n_datasets = len(datasets)
     # Iterate over datasets, computing a shade for each from the colormap.
@@ -166,8 +166,8 @@ def bd_rate_simpson(metric_set1, metric_set2):
         v2 = pchip_interpolate(metric2, log_rate2, samples)
 
         # Integrate the curves using Simpson's rule.
-        int_v1 = simpson(v1, dx=interval)
-        int_v2 = simpson(v2, dx=interval)
+        int_v1 = simpson(v1, dx=float(interval))
+        int_v2 = simpson(v2, dx=float(interval))
 
         # Compute the average difference in the log domain.
         avg_exp_diff = (int_v2 - int_v1) / (max_int - min_int)
