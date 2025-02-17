@@ -13,10 +13,18 @@
 import argparse
 import os
 from argparse import Namespace
+
 from metrics import CoreVideo, DstVideo, VideoEnc
 
 
-def write_stats(name: str, q: int, dst: DstVideo) -> None:
+def write_stats(
+    name: str,
+    q: int,
+    size: int,
+    ssimu2_hmean: float,
+    butter_distance: float,
+    w_xpsnr: float,
+) -> None:
     """
     Write metric stats to a CSV file.
     """
@@ -26,12 +34,12 @@ def write_stats(name: str, q: int, dst: DstVideo) -> None:
         with open(csv, "w") as f:
             f.write("q,output_filesize,ssimu2_hmean,butter_distance,wxpsnr\n")
             f.write(
-                f"{q},{dst.size},{dst.ssimu2_hmn:.5f},{dst.butter_dis:.5f},{dst.w_xpsnr:.5f}\n"
+                f"{q},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
             )
     else:
         with open(csv, "a") as f:
             f.write(
-                f"{q},{dst.size},{dst.ssimu2_hmn:.5f},{dst.butter_dis:.5f},{dst.w_xpsnr:.5f}\n"
+                f"{q},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
             )
 
 
@@ -40,7 +48,12 @@ def main():
         description="Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes."
     )
     parser.add_argument(
-        "-i", "--input", required=True, type=str, help="Path to source video file"
+        "-i",
+        "--inputs",
+        required=True,
+        type=str,
+        nargs="+",
+        help="Path(s) to source video file(s)",
     )
     parser.add_argument(
         "-q",
@@ -87,7 +100,7 @@ def main():
     )
 
     args: Namespace = parser.parse_args()
-    src_pth: str = args.input
+    src_pth: list[str] = [p for p in args.inputs]
     quality_list: list[int] = [int(q) for q in args.quality.split()]
     enc: str = args.encoder
     csv_out: str = args.output
@@ -96,23 +109,58 @@ def main():
     clean: bool = args.keep
     enc_args: list[str] = args.encoder_args
 
-    s: CoreVideo = CoreVideo(src_pth, every, gpu_threads)
-    print(f"Source video: {s.name}")
+    cumulative_sizes: list[dict[int, int]] = [
+        {q: 0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    cumulative_ssimu2: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    cumulative_butter: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    cumulative_wxpsnr: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    i: int = 0
 
-    print(f"Running encoder at qualities: {quality_list}")
+    for src in src_pth:
+        s: CoreVideo = CoreVideo(src, every, gpu_threads)
+        print(f"Source video: {s.name}")
+
+        print(f"Running encoder at qualities: {quality_list}")
+        for q in quality_list:
+            print(f"Quality: {q}")
+
+            e: VideoEnc = VideoEnc(s, q, enc, enc_args)
+            v: DstVideo = e.encode(every, gpu_threads)
+            print(f"Encoded video: {e.dst_pth}")
+
+            v.calculate_ssimulacra2(s)
+            v.calculate_butteraugli(s)
+            v.calculate_xpsnr(s)
+
+            cumulative_sizes[i][q] = v.size
+            cumulative_ssimu2[i][q] = v.ssimu2_hmn
+            cumulative_butter[i][q] = v.butter_dis
+            cumulative_wxpsnr[i][q] = v.w_xpsnr
+
+            if clean:
+                e.remove_output()
+        i += 1
+
+    avg_size: dict[int, int] = {}
+    avg_ssimu2: dict[int, float] = {}
+    avg_butter: dict[int, float] = {}
+    avg_wxpsnr: dict[int, float] = {}
+
     for q in quality_list:
-        print(f"Quality: {q}")
-
-        e: VideoEnc = VideoEnc(s, q, enc, enc_args)
-        v: DstVideo = e.encode(every, gpu_threads)
-        print(f"Encoded video: {e.dst_pth}")
-
-        v.calculate_ssimulacra2(s)
-        v.calculate_butteraugli(s)
-        v.calculate_xpsnr(s)
-        write_stats(csv_out, q, v)
-        if clean:
-            e.remove_output()
+        avg_size[q] = int(sum(cumulative_sizes[j][q] for j in range(i)) / i)
+        avg_ssimu2[q] = sum(cumulative_ssimu2[j][q] for j in range(i)) / i
+        avg_butter[q] = sum(cumulative_butter[j][q] for j in range(i)) / i
+        avg_wxpsnr[q] = sum(cumulative_wxpsnr[j][q] for j in range(i)) / i
+        write_stats(
+            csv_out, q, avg_size[q], avg_ssimu2[q], avg_butter[q], avg_wxpsnr[q]
+        )
 
 
 if __name__ == "__main__":
