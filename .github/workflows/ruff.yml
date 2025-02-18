@@ -1,0 +1,23 @@
+name: Ruff Lint
+
+on: [push]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python-version: ["3.13.1"]
+        steps:
+            - uses: actions/checkout@v4
+            - uses: astral-sh/ruff-action@v3
+              with:
+                  version: "latest"
+                  src: >-
+                      ./scripts/encode.py
+                      ./scripts/metrics.py
+                      ./scripts/plot.py
+                      ./scripts/scores.py
+                      ./scripts/stats.py
+            - run: ruff check --fix
+            - run: ruff format
