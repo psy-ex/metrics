@@ -24,11 +24,12 @@ from scipy.interpolate import pchip_interpolate
 def read_csv(filename):
     """
     Read CSV file and return data as dictionary of lists.
-    Assumes CSV columns: 'q', 'output_filesize', 'ssimu2_hmean',
-    'butter_distance', and 'wxpsnr'.
+    Assumes CSV columns: 'q', 'encode_time', 'output_filesize',
+    'ssimu2_hmean', 'butter_distance', and 'wxpsnr'.
     """
     data = {
         "q": [],
+        "encode_time": [],
         "output_filesize": [],
         "ssimu2_hmean": [],
         "butter_distance": [],
@@ -43,11 +44,43 @@ def read_csv(filename):
     return data
 
 
+def bdrate_vs_time_csv(
+    name: str,
+    time: float,
+    bd_rates: dict,
+) -> None:
+    """
+    Write BD-rate vs encode time to a CSV file.
+    """
+    csv_file: str = "bd_vs_time.csv"
+    headers = [
+        "name",
+        "avg_encode_time",
+        "ssimu2_hmean_bd",
+        "butter_distance_bd",
+        "wxpsnr_bd",
+    ]
+
+    if os.path.exists(csv_file):
+        # Append to existing file
+        with open(csv_file, "a") as f:
+            f.write(
+                f"{name},{time:.5f},{bd_rates.get('ssimu2_hmean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f}\n"
+            )
+    else:
+        # Create new file with headers
+        with open(csv_file, "w") as f:
+            f.write(",".join(headers) + "\n")
+            f.write(
+                f"{name},{time:.5f},{bd_rates.get('ssimu2_hmean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f}\n"
+            )
+
+
 def create_metric_plot(datasets, metric_name: str, fmt: str):
     """
     Create a plot for the specified metric for all given datasets.
     The datasets argument should be a list of tuples (label, data).
-    Each dataset’s data is a dictionary (from read_csv), and label is the dataset identifier.
+    Each dataset's data is a dictionary (from read_csv), and label is the dataset identifier.
     """
     plt.figure(figsize=(10, 6))
     plt.style.use("dark_background")
@@ -179,6 +212,14 @@ def bd_rate_simpson(metric_set1, metric_set2):
     return bd_rate_percent
 
 
+def calculate_average_encode_time(data):
+    """
+    Calculate the average encode time from the data.
+    """
+    encode_times = data["encode_time"]
+    return sum(encode_times) / len(encode_times)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Plot codec metrics from one or more CSV files (one per codec) for side-by-side comparison."
@@ -214,6 +255,11 @@ def main():
     for metric in metrics:
         create_metric_plot(datasets, metric, fmt)
 
+    # Calculate and output the average encode time for each CSV file
+    for label, data in datasets:
+        avg_time = calculate_average_encode_time(data)
+        print(f"Average encode time for {label}: {avg_time:.5f} seconds")
+
     # If there are at least two datasets, compute and print the BD-rate for each metric.
     if len(datasets) >= 2:
         metric_labels = {
@@ -229,6 +275,10 @@ def main():
             print(
                 "BD-rate values between '{}' & '{}'".format(file1_label, filecmp_label)
             )
+
+            # Store BD-rate values for this comparison
+            bd_rates = {}
+
             for metric in metrics:
                 # Create lists of tuples (output_filesize, metric_value) for the two files.
                 data1 = datasets[0][1]
@@ -237,6 +287,8 @@ def main():
                 metric_set2 = list(zip(data2["output_filesize"], data2[metric]))
 
                 bd_rate = bd_rate_simpson(metric_set1, metric_set2)
+                bd_rates[metric] = bd_rate
+
                 # Decide which file is better based on the sign of the bd_rate value.
                 if bd_rate < 0:
                     # Negative BD-rate indicates that the second file (the one it is compared with)
@@ -250,10 +302,27 @@ def main():
                 print(
                     f"{metric_labels.get(metric, metric)}\033[1m{bd_rate:7.2f}%\033[0m -> {winner_msg}"
                 )
+
+            # Calculate average encode times
+            avg_time1 = calculate_average_encode_time(data1)
+            avg_time2 = calculate_average_encode_time(data2)
+
+            # Write BD-rate vs time data to CSV
+            bdrate_vs_time_csv(
+                file1_label, avg_time1, {metric: 0.0 for metric in metrics}
+            )  # Reference file
+            bdrate_vs_time_csv(filecmp_label, avg_time2, bd_rates)
+
             if idx < len(datasets) - 1:
                 print()  # Empty line for readability
     else:
         print("Need at least two CSV files to compute BD-rate values.")
+
+        # Still write the encode time for a single file
+        if len(datasets) == 1:
+            label, data = datasets[0]
+            avg_time = calculate_average_encode_time(data)
+            bdrate_vs_time_csv(label, avg_time, {metric: 0.0 for metric in metrics})
 
 
 if __name__ == "__main__":

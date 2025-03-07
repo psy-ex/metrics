@@ -20,6 +20,7 @@ from metrics import CoreVideo, DstVideo, VideoEnc
 def write_stats(
     name: str,
     q: int,
+    encode_time: float,
     size: int,
     ssimu2_hmean: float,
     butter_distance: float,
@@ -32,14 +33,16 @@ def write_stats(
     csv: str = name if name.endswith(".csv") else f"{name}.csv"
     if not os.path.exists(csv):
         with open(csv, "w") as f:
-            f.write("q,output_filesize,ssimu2_hmean,butter_distance,wxpsnr\n")
             f.write(
-                f"{q},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
+                "q,encode_time,output_filesize,ssimu2_hmean,butter_distance,wxpsnr\n"
+            )
+            f.write(
+                f"{q},{encode_time:.5f},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
             )
     else:
         with open(csv, "a") as f:
             f.write(
-                f"{q},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
+                f"{q},{encode_time:.5f},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
             )
 
 
@@ -90,7 +93,7 @@ def main():
         "--cpu-threads",
         type=int,
         default=0,
-        help="Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)",
+        help="Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)",
     )
     parser.add_argument(
         "-k",
@@ -120,6 +123,9 @@ def main():
     cumulative_sizes: list[dict[int, int]] = [
         {q: 0 for q in quality_list} for _ in range(len(src_pth))
     ]
+    cumulative_times: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
     cumulative_ssimu2: list[dict[int, float]] = [
         {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
     ]
@@ -141,12 +147,13 @@ def main():
 
             e: VideoEnc = VideoEnc(s, q, enc, enc_args)
             v: DstVideo = e.encode(every, threads, use_gpu)
-            print(f"Encoded video: {e.dst_pth}")
+            print(f"Encoded video: {e.dst_pth} (took {e.time:.2f} seconds)")
 
             v.calculate_ssimulacra2(s)
             v.calculate_butteraugli(s)
             v.calculate_xpsnr(s)
 
+            cumulative_times[i][q] = e.time
             cumulative_sizes[i][q] = v.size
             cumulative_ssimu2[i][q] = v.ssimu2_hmn
             cumulative_butter[i][q] = v.butter_dis
@@ -156,18 +163,26 @@ def main():
                 e.remove_output()
         i += 1
 
+    avg_time: dict[int, float] = {}
     avg_size: dict[int, int] = {}
     avg_ssimu2: dict[int, float] = {}
     avg_butter: dict[int, float] = {}
     avg_wxpsnr: dict[int, float] = {}
 
     for q in quality_list:
+        avg_time[q] = sum(cumulative_times[j][q] for j in range(i)) / i
         avg_size[q] = int(sum(cumulative_sizes[j][q] for j in range(i)) / i)
         avg_ssimu2[q] = sum(cumulative_ssimu2[j][q] for j in range(i)) / i
         avg_butter[q] = sum(cumulative_butter[j][q] for j in range(i)) / i
         avg_wxpsnr[q] = sum(cumulative_wxpsnr[j][q] for j in range(i)) / i
         write_stats(
-            csv_out, q, avg_size[q], avg_ssimu2[q], avg_butter[q], avg_wxpsnr[q]
+            csv_out,
+            q,
+            avg_time[q],
+            avg_size[q],
+            avg_ssimu2[q],
+            avg_butter[q],
+            avg_wxpsnr[q],
         )
 
 

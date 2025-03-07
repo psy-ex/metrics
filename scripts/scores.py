@@ -40,7 +40,7 @@ def main() -> None:
         "--cpu-threads",
         type=int,
         default=0,
-        help="Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)",
+        help="Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)",
     )
 
     args: Namespace = parser.parse_args()
@@ -60,9 +60,12 @@ def main() -> None:
     dst.print_ssimulacra2()
 
     # Calculate Butteraugli scores
-    print("Running \033[93mButteraugli\033[0m ...")
-    dst.calculate_butteraugli(src)
-    dst.print_butteraugli()
+    if use_gpu:
+        print("Running \033[93mButteraugli\033[0m ...")
+        dst.calculate_butteraugli(src)
+        dst.print_butteraugli()
+    else:
+        dst.calculate_butteraugli(src)
 
     # Calculate XPSNR scores
     print("Running \033[91mXPSNR\033[0m ...")

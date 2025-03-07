@@ -61,7 +61,7 @@ def main():
         "--cpu-threads",
         type=int,
         default=0,
-        help="Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)",
+        help="Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)",
     )
     parser.add_argument(
         "-n", "--no-metrics", action="store_true", help="Skip metrics calculations"
@@ -87,13 +87,14 @@ def main():
     else:
         e: VideoEnc = VideoEnc(s, q, enc, enc_args)
     v: DstVideo = e.encode(every, threads, use_gpu)
-    print(f"Encoded video: {e.dst_pth}")
+    print(f"Encoded video: {e.dst_pth} (took {e.time:.2f} seconds)")
 
     if run_metrics:
         v.calculate_ssimulacra2(s)
         v.print_ssimulacra2()
         v.calculate_butteraugli(s)
-        v.print_butteraugli()
+        if use_gpu:
+            v.print_butteraugli()
         v.calculate_xpsnr(s)
         v.print_xpsnr()
 

@@ -1,6 +1,7 @@
-import math
 import os
 import re
+import math
+import time
 import statistics
 import subprocess
 from subprocess import Popen
@@ -154,7 +155,10 @@ class DstVideo(CoreVideo):
         if self.gpu:
             butter_obj = src.video.vship.BUTTERAUGLI(self.video)
         else:
-            butter_obj = src.video.julek.Butteraugli(self.video, [0])
+            print("Skipping Butteraugli calculation (no GPU threads available)")
+            self.butter_dis = 0.0
+            self.butter_mds = 0.0
+            return
 
         butter_distance_list: list[float] = []
         with tqdm(
@@ -164,11 +168,7 @@ class DstVideo(CoreVideo):
             colour="yellow",
         ) as pbar:
             for i, f in enumerate(butter_obj.frames()):
-                d: float = (
-                    f.props["_FrameButteraugli"]
-                    if not self.gpu
-                    else f.props["_BUTTERAUGLI_INFNorm"]
-                )
+                d: float = (f.props["_BUTTERAUGLI_3Norm"])
                 butter_distance_list.append(d)
                 pbar.update(1)
                 if not i % 24:
@@ -271,6 +271,7 @@ class VideoEnc:
     q: int
     encoder: str
     encoder_args: list[str]
+    time: float
 
     def __init__(
         self,
@@ -388,6 +389,7 @@ class VideoEnc:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        start_time: float = time.time()
         enc_proc: Popen[str] = subprocess.Popen(
             self.enc_cmd,
             stdin=ff_proc.stdout,
@@ -396,6 +398,8 @@ class VideoEnc:
             universal_newlines=True,
         )
         _, stderr = enc_proc.communicate()
+        encode_time: float = time.time() - start_time
+        self.time = encode_time
         print(stderr)
         return DstVideo(self.dst_pth, e, t, g)
 

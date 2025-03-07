@@ -2,8 +2,8 @@
 
 The Psychovisual Experts group presents `metrics`, a video quality assessment
 toolkit that provides a suite of scripts for measuring and comparing video
-codecs using metrics such as SSIMULACRA2, Butteraugli, and XPSNR. The project
-includes modules for processing video files, running video encoding, and
+codecs using metrics such as SSIMULACRA2, Butteraugli (3pnorm), and XPSNR. The
+project includes modules for processing video files, running video encoding, and
 generating both numerical and visual reports from quality metrics.
 
 The four main scripts are:
@@ -50,7 +50,6 @@ PSY-EX Metrics enables you to:
 - VapourSynth, and required plugins:
   - ffms2
   - [vszip](https://github.com/dnjulek/vapoursynth-zip)
-  - [julek](https://github.com/dnjulek/vapoursynth-julek-plugin)
   - [vship](https://github.com/Line-fr/Vship) [Optional: provides GPU support]
 
 ### Install Steps
@@ -97,7 +96,7 @@ options:
   -g, --gpu-threads GPU_THREADS
                         Number of GPU threads for SSIMULACRA2 & Butteraugli
   -c, --cpu-threads CPU_THREADS
-                        Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)
+                        Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)
 ```
 
 Example:
@@ -132,7 +131,7 @@ options:
   -g, --gpu-threads GPU_THREADS
                         Number of GPU threads for SSIMULACRA2 & Butteraugli
   -c, --cpu-threads CPU_THREADS
-                        Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)
+                        Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)
   -n, --no-metrics      Skip metrics calculations
 ```
 
@@ -175,7 +174,7 @@ options:
   -g, --gpu-threads GPU_THREADS
                         Number of GPU threads for SSIMULACRA2 & Butteraugli
   -c, --cpu-threads CPU_THREADS
-                        Number of CPU threads for SSIMULACRA2 & Butteraugli (overridden by GPU threads)
+                        Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)
   -k, --keep            Keep output video files
 ```
 
@@ -240,6 +239,11 @@ WebP images.
 
 It will also print BD-rate statistics for each metric, comparing the two results
 from the CSV files.
+
+`plot.py` also outputs a CSV file containing the average encode time for an
+input file accompanied by the corresponding average BD-rate. These statistics
+can assist in looking at overall encoder efficiency across multiple speed
+presets or configurations.
 
 ## Harmonic Mean
 
