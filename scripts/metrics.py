@@ -168,7 +168,7 @@ class DstVideo(CoreVideo):
             colour="yellow",
         ) as pbar:
             for i, f in enumerate(butter_obj.frames()):
-                d: float = (f.props["_BUTTERAUGLI_3Norm"])
+                d: float = f.props["_BUTTERAUGLI_3Norm"]
                 butter_distance_list.append(d)
                 pbar.update(1)
                 if not i % 24:
