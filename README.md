@@ -245,59 +245,6 @@ input file accompanied by the corresponding average BD-rate. These statistics
 can assist in looking at overall encoder efficiency across multiple speed
 presets or configurations.
 
-## Harmonic Mean
-
-A quick note about harmonic mean calculation for SSIMULACRA2: it is currently a
-bit unusual, since we have to factor in negative SSIMULACRA2 scores. I'll
-explain what I did below for the sake of transparency.
-
-The real harmonic mean (H) of a set of numbers is calculated using the formula:
-
-```math
-H = n / (∑(1/x_i))
-```
-
-Where `n` is the number of values and `x_i` represents each value in the
-dataset.
-
-Our harmonic mean calculation looks like this:
-
-```python
-harmonic_mean: float = len(positive_scores) / sum_reciprocals
-```
-
-In order to get here, we:
-
-1. Put together a list of all of the _positive_ SSIMULACRA2 scores we recorded
-2. Put together a list of all of the _negative_ SSIMULACRA2 scores we recorded
-3. Calculated the sum of the reciprocals of the positive & negative scores
-4. Subtract the sum of the reciprocals of the negative scores from the sum of
-   the reciprocals of the positive scores, increasing the size of the
-   denominator relative to the number of negative scores we have. This results
-   in a smaller harmonic mean if we have more negative scores.
-5. Divide the number of positive scores by the sum we calculated in step 4; we
-   use the number of positive scores because this further penalizes the harmonic
-   mean for having negative scores by minimizing the value of the numerator.
-
-So, as a mathematical formula, we would have:
-
-```math
-H = \frac{|P|}{\sum_{i \in P} \frac{1}{x_i} - \sum_{j \in N} \frac{1}{x_j}}
-```
-
-Where:
-
-- P = set of positive scores
-- N = set of negative scores
-- |P| = number of positive scores
-
-This method brings the harmonic mean closer to 0 as you add more negative
-values. So, if you see a really low harmonic mean, check the standard "average"
-plot to see what's going on.
-
-I guess it isn't really a "harmonic mean" anymore, but it should be more useful
-than the standard harmonic mean with SSIMULACRA2.
-
 ## License
 
 This project was originally authored by @gianni-rosato & is provided as FOSS

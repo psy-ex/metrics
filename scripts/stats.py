@@ -22,7 +22,7 @@ def write_stats(
     q: int,
     encode_time: float,
     size: int,
-    ssimu2_hmean: float,
+    ssimu2_mean: float,
     butter_distance: float,
     w_xpsnr: float,
 ) -> None:
@@ -34,15 +34,15 @@ def write_stats(
     if not os.path.exists(csv):
         with open(csv, "w") as f:
             f.write(
-                "q,encode_time,output_filesize,ssimu2_hmean,butter_distance,wxpsnr\n"
+                "q,encode_time,output_filesize,ssimu2_mean,butter_distance,wxpsnr\n"
             )
             f.write(
-                f"{q},{encode_time:.5f},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
+                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
             )
     else:
         with open(csv, "a") as f:
             f.write(
-                f"{q},{encode_time:.5f},{size},{ssimu2_hmean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
+                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
             )
 
 
@@ -155,7 +155,7 @@ def main():
 
             cumulative_times[i][q] = e.time
             cumulative_sizes[i][q] = v.size
-            cumulative_ssimu2[i][q] = v.ssimu2_hmn
+            cumulative_ssimu2[i][q] = v.ssimu2_avg
             cumulative_butter[i][q] = v.butter_dis
             cumulative_wxpsnr[i][q] = v.w_xpsnr
 

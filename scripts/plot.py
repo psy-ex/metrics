@@ -25,13 +25,13 @@ def read_csv(filename):
     """
     Read CSV file and return data as dictionary of lists.
     Assumes CSV columns: 'q', 'encode_time', 'output_filesize',
-    'ssimu2_hmean', 'butter_distance', and 'wxpsnr'.
+    'ssimu2_mean', 'butter_distance', and 'wxpsnr'.
     """
     data = {
         "q": [],
         "encode_time": [],
         "output_filesize": [],
-        "ssimu2_hmean": [],
+        "ssimu2_mean": [],
         "butter_distance": [],
         "wxpsnr": [],
     }
@@ -56,7 +56,7 @@ def bdrate_vs_time_csv(
     headers = [
         "name",
         "avg_encode_time",
-        "ssimu2_hmean_bd",
+        "ssimu2_mean_bd",
         "butter_distance_bd",
         "wxpsnr_bd",
     ]
@@ -65,14 +65,14 @@ def bdrate_vs_time_csv(
         # Append to existing file
         with open(csv_file, "a") as f:
             f.write(
-                f"{name},{time:.5f},{bd_rates.get('ssimu2_hmean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f}\n"
+                f"{name},{time:.5f},{bd_rates.get('ssimu2_mean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f}\n"
             )
     else:
         # Create new file with headers
         with open(csv_file, "w") as f:
             f.write(",".join(headers) + "\n")
             f.write(
-                f"{name},{time:.5f},{bd_rates.get('ssimu2_hmean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f}\n"
+                f"{name},{time:.5f},{bd_rates.get('ssimu2_mean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f}\n"
             )
 
 
@@ -86,14 +86,14 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
     plt.style.use("dark_background")
 
     # For SSIMULACRA2, set background colors to black.
-    if metric_name == "ssimu2_hmean":
+    if metric_name == "ssimu2_mean":
         plt.gca().set_facecolor("black")
         plt.gcf().set_facecolor("black")
 
     # For each metric, define a colormap so that multiple CSV files
     # use different shades of the same base hue.
     colormaps = {
-        "ssimu2_hmean": plt.colormaps.get_cmap("Blues"),
+        "ssimu2_mean": plt.colormaps.get_cmap("Blues"),
         "butter_distance": plt.colormaps.get_cmap("YlOrBr"),
         "wxpsnr": plt.colormaps.get_cmap("Reds"),
     }
@@ -133,7 +133,7 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
     # Set labels.
     plt.xlabel("Output Filesize (MB)", color="gainsboro", family="monospace")
     metric_labels = {
-        "ssimu2_hmean": "SSIMULACRA2 Harmonic Mean",
+        "ssimu2_mean": "Average SSIMULACRA2",
         "butter_distance": "Butteraugli Distance",
         "wxpsnr": "W-XPSNR",
     }
@@ -251,7 +251,7 @@ def main():
         datasets.append((label, data))
 
     # Create plots for each metric.
-    metrics = ["ssimu2_hmean", "butter_distance", "wxpsnr"]
+    metrics = ["ssimu2_mean", "butter_distance", "wxpsnr"]
     for metric in metrics:
         create_metric_plot(datasets, metric, fmt)
 
@@ -263,7 +263,7 @@ def main():
     # If there are at least two datasets, compute and print the BD-rate for each metric.
     if len(datasets) >= 2:
         metric_labels = {
-            "ssimu2_hmean": "\033[94mSSIMULACRA2\033[0m Harmonic Mean: ",
+            "ssimu2_mean": "\033[94mSSIMULACRA2\033[0m Average: ",
             "butter_distance": "\033[93mButteraugli\033[0m Distance:      ",
             "wxpsnr": "W-\033[91mXPSNR\033[0m:                   ",
         }

@@ -78,7 +78,6 @@ class DstVideo(CoreVideo):
 
     # SSIMULACRA2 scores
     ssimu2_avg: float
-    ssimu2_hmn: float
     ssimu2_sdv: float
     ssimu2_p10: float
 
@@ -102,7 +101,6 @@ class DstVideo(CoreVideo):
         self.gpu = g
         self.video = self.vapoursynth_init()
         self.ssimu2_avg = 0.0
-        self.ssimu2_hmn = 0.0
         self.ssimu2_sdv = 0.0
         self.ssimu2_p10 = 0.0
         self.butter_dis = 0.0
@@ -140,7 +138,7 @@ class DstVideo(CoreVideo):
                         }
                     )
 
-        self.ssimu2_avg, self.ssimu2_hmn, self.ssimu2_sdv, self.ssimu2_p10 = (
+        self.ssimu2_avg, self.ssimu2_sdv, self.ssimu2_p10 = (
             calc_some_scores(ssimu2_list)
         )
 
@@ -235,7 +233,6 @@ class DstVideo(CoreVideo):
             f"\033[94mSSIMULACRA2\033[0m scores for every \033[95m{self.e}\033[0m frame:"
         )
         print(f" Average:       \033[1m{self.ssimu2_avg:.5f}\033[0m")
-        print(f" Harmonic Mean: \033[1m{self.ssimu2_hmn:.5f}\033[0m")
         print(f" Std Deviation: \033[1m{self.ssimu2_sdv:.5f}\033[0m")
         print(f" 10th Pctile:   \033[1m{self.ssimu2_p10:.5f}\033[0m")
 
@@ -417,22 +414,11 @@ def psnr_to_mse(p: float, m: int) -> float:
     return (m**2) / (10 ** (p / 10))
 
 
-def calc_some_scores(score_list: list[float]) -> tuple[float, float, float, float]:
+def calc_some_scores(score_list: list[float]) -> tuple[float, float, float]:
     """
-    Calculate the average, harmonic mean, standard deviation, & 10th percentile of a list of scores.
+    Calculate the average, standard deviation, & 10th percentile of a list of scores.
     """
     average: float = statistics.mean(score_list)
     std_dev: float = statistics.stdev(score_list)
-    positive_scores: list[float] = [score for score in score_list if score > 0.0]
-    negative_scores: list[float] = [score for score in score_list if score <= 0.0]
-    if positive_scores:
-        list_of_pos_reciprocals: list[float] = [1 / score for score in positive_scores]
-        list_of_neg_reciprocals: list[float] = [1 / score for score in negative_scores]
-        sum_reciprocals: float = sum(list_of_pos_reciprocals) - sum(
-            list_of_neg_reciprocals
-        )
-        harmonic_mean: float = len(positive_scores) / sum_reciprocals
-    else:
-        harmonic_mean: float = 0.0
     percentile_10th: float = statistics.quantiles(score_list, n=100)[10]
-    return (average, harmonic_mean, std_dev, percentile_10th)
+    return (average, std_dev, percentile_10th)
