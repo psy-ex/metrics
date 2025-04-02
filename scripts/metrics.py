@@ -52,7 +52,7 @@ class CoreVideo:
         """
         core = vs.core
         print(
-            f"Using {self.threads} {"GPU" if self.gpu else "CPU"} threads for SSIMULACRA2 & Butteraugli."
+            f"Using {self.threads} {'GPU' if self.gpu else 'CPU'} threads for SSIMULACRA2 & Butteraugli."
         )
         core.num_threads = self.threads
         video = core.ffms2.Source(source=self.path, cache=False, threads=self.threads)
