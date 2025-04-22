@@ -1,9 +1,9 @@
+import math
 import os
 import re
-import math
-import time
 import statistics
 import subprocess
+import time
 from subprocess import Popen
 
 import vapoursynth as vs
@@ -52,7 +52,7 @@ class CoreVideo:
         """
         core = vs.core
         print(
-            f"Using {self.threads} {'GPU' if self.gpu else 'CPU'} threads for SSIMULACRA2 & Butteraugli."
+            f"Using {self.threads} {'GPU' if self.gpu else 'CPU'} threads for {'SSIMULACRA2 & Butteraugli' if self.gpu else 'SSIMULACRA2'}"
         )
         core.num_threads = self.threads
         video = core.ffms2.Source(source=self.path, cache=False, threads=self.threads)
@@ -138,8 +138,8 @@ class DstVideo(CoreVideo):
                         }
                     )
 
-        self.ssimu2_avg, self.ssimu2_sdv, self.ssimu2_p10 = (
-            calc_some_scores(ssimu2_list)
+        self.ssimu2_avg, self.ssimu2_sdv, self.ssimu2_p10 = calc_some_scores(
+            ssimu2_list
         )
 
     def calculate_butteraugli(
@@ -262,12 +262,12 @@ class VideoEnc:
     Video encoding class, containing encoder commands.
     """
 
-    enc_cmd: list[str]
     src: CoreVideo
     dst_pth: str
     q: int
     encoder: str
     encoder_args: list[str]
+    enc_cmd: list[str]
     time: float
 
     def __init__(
@@ -278,83 +278,93 @@ class VideoEnc:
         encoder_args: list[str],
         dst_pth: str = "",
     ) -> None:
-        self.enc_cmd = []
         self.src = src
         self.dst_pth = dst_pth
         self.q = q
         self.encoder = encoder
         self.encoder_args = encoder_args if encoder_args else [""]
         self.enc_cmd = self.set_enc_cmd()
+        self.time = 0
 
     def set_enc_cmd(self) -> list[str]:
         p: str = os.path.splitext(os.path.basename(self.src.path))[0]
         if not self.dst_pth:
-            if self.encoder == "svtav1":
-                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
-            elif self.encoder == "aomenc":
-                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
-            elif self.encoder == "vvenc":
-                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.266"
-            elif self.encoder == "x265":
-                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.265"
-            else:
-                self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.264"
-        print(f"Selected encoder: {self.encoder}")
-        print(f"Encoding {self.src.path} to {self.dst_pth} ...")
-        if self.encoder == "svtav1":
-            cmd: list[str] = [
-                "SvtAv1EncApp",
-                "-i",
-                "-",
-                "-b",
-                f"{self.dst_pth}",
-                "--crf",
-                f"{self.q}",
-            ]
-        elif self.encoder == "aomenc":
-            cmd: list[str] = [
-                "aomenc",
-                "--ivf",
-                "--end-usage=q",
-                f"--cq-level={self.q}",
-                "--passes=1",
-                "-y",
-                "-",
-                "-o",
-                f"{self.dst_pth}",
-            ]
-        elif self.encoder == "x265":
-            cmd: list[str] = [
-                "x265",
-                "--y4m",
-                "-",
-                "--crf",
-                f"{self.q}",
-                "-o",
-                f"{self.dst_pth}",
-            ]
-        elif self.encoder == "vvenc":
-            cmd: list[str] = [
-                "vvencapp",
-                "--y4m",
-                "-i",
-                "-",
-                "--qp",
-                f"{self.q}",
-                "-o",
-                f"{self.dst_pth}",
-            ]
+            match self.encoder:
+                case "x264":
+                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.264"
+                case "x265":
+                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.265"
+                case "vvenc":
+                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.266"
+                case _:
+                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
         else:
-            cmd: list[str] = [
-                "x264",
-                "--demuxer",
-                "y4m",
-                "--crf",
-                f"{self.q}",
-                "-o",
-                f"{self.dst_pth}",
-                "-",
-            ]
+            match self.encoder:
+                case "x264":
+                    self.dst_pth = self.dst_pth + ".264"
+                case "x265":
+                    self.dst_pth = self.dst_pth + ".265"
+                case "vvenc":
+                    self.dst_pth = self.dst_pth + ".266"
+                case _:
+                    self.dst_pth = self.dst_pth + ".ivf"
+
+        match self.encoder:
+            case "x264":
+                cmd: list[str] = [
+                    "x264",
+                    "--demuxer",
+                    "y4m",
+                    "--crf",
+                    f"{self.q}",
+                    "-o",
+                    f"{self.dst_pth}",
+                    "-",
+                ]
+            case "x265":
+                cmd: list[str] = [
+                    "x265",
+                    "--y4m",
+                    "-",
+                    "--crf",
+                    f"{self.q}",
+                    "-o",
+                    f"{self.dst_pth}",
+                ]
+            case "vvenc":
+                cmd: list[str] = [
+                    "vvencapp",
+                    "--y4m",
+                    "-i",
+                    "-",
+                    "--qp",
+                    f"{self.q}",
+                    "-o",
+                    f"{self.dst_pth}",
+                ]
+            case "svtav1":
+                cmd: list[str] = [
+                    "SvtAv1EncApp",
+                    "-i",
+                    "-",
+                    "-b",
+                    f"{self.dst_pth}",
+                    "--crf",
+                    f"{self.q}",
+                ]
+            case _:  # "aomenc":
+                cmd: list[str] = [
+                    "aomenc",
+                    "--ivf",
+                    "--end-usage=q",
+                    f"--cq-level={self.q}",
+                    "--passes=1",
+                    "-y",
+                    "-",
+                    "-o",
+                    f"{self.dst_pth}",
+                ]
+
         if self.encoder_args != [""]:
             cmd.extend(self.encoder_args)
         print(" ".join(cmd))
@@ -380,7 +390,9 @@ class VideoEnc:
             "yuv4mpegpipe",
             "-",
         ]
-        print(f"Encoding video at Q{self.q} with {self.encoder} ...")
+        print(
+            f"Encoding {self.src.name} at Q{self.q} with {self.encoder} ({self.src.path} --> {self.dst_pth})"
+        )
         ff_proc: Popen[bytes] = subprocess.Popen(
             ff_cmd,
             stdout=subprocess.PIPE,

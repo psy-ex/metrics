@@ -114,7 +114,7 @@ every 3rd frame.
 % ./encode.py --help
 usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-g GPU_THREADS] [-c CPU_THREADS] [-n] {x264,x265,svtav1,aomenc} ...
 
-Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
+Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a single video encode.
 
 positional arguments:
   {x264,x265,svtav1,aomenc}

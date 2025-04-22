@@ -12,6 +12,7 @@
 
 import argparse
 from argparse import Namespace
+
 from metrics import CoreVideo, DstVideo
 
 
@@ -48,29 +49,26 @@ def main() -> None:
     threads: int = args.gpu_threads if args.gpu_threads else args.cpu_threads
     use_gpu: bool = args.gpu_threads > 0
 
-    src: CoreVideo = CoreVideo(args.source, every, threads, use_gpu)
-    dst: DstVideo = DstVideo(args.distorted, every, threads, use_gpu)
+    s: CoreVideo = CoreVideo(args.source, every, threads, use_gpu)
+    v: DstVideo = DstVideo(args.distorted, every, threads, use_gpu)
 
-    print(f"Source video:    \033[4m{src.name}\033[0m")
-    print(f"Distorted video: \033[4m{dst.name}\033[0m")
+    print(f"Source video:    \033[4m{s.name}\033[0m")
+    print(f"Distorted video: \033[4m{v.name}\033[0m")
 
     # Calculate SSIMULACRA2 scores
-    print("Running \033[94mSSIMULACRA2\033[0m ...")
-    dst.calculate_ssimulacra2(src)
-    dst.print_ssimulacra2()
+    v.calculate_ssimulacra2(s)
+    v.print_ssimulacra2()
 
     # Calculate Butteraugli scores
     if use_gpu:
-        print("Running \033[93mButteraugli\033[0m ...")
-        dst.calculate_butteraugli(src)
-        dst.print_butteraugli()
+        v.calculate_butteraugli(s)
+        v.print_butteraugli()
     else:
-        dst.calculate_butteraugli(src)
+        v.calculate_butteraugli(s)
 
     # Calculate XPSNR scores
-    print("Running \033[91mXPSNR\033[0m ...")
-    dst.calculate_xpsnr(src)
-    dst.print_xpsnr()
+    v.calculate_xpsnr(s)
+    v.print_xpsnr()
 
 
 if __name__ == "__main__":

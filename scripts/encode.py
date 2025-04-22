@@ -12,12 +12,13 @@
 
 import argparse
 from argparse import Namespace
+
 from metrics import CoreVideo, DstVideo, VideoEnc
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes."
+        description="Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a single video encode."
     )
     parser.add_argument(
         "-i", "--input", required=True, type=str, help="Path to source video file"
@@ -79,15 +80,13 @@ def main():
     run_metrics: bool = not args.no_metrics
 
     s: CoreVideo = CoreVideo(src_pth, every, threads, use_gpu)
-    print(f"Source video: {s.name}")
 
-    print(f"Running encoder at Q{q}")
     if dst_pth:
         e: VideoEnc = VideoEnc(s, q, enc, enc_args, dst_pth)
     else:
         e: VideoEnc = VideoEnc(s, q, enc, enc_args)
     v: DstVideo = e.encode(every, threads, use_gpu)
-    print(f"Encoded video: {e.dst_pth} (took {e.time:.2f} seconds)")
+    print(f"Encoded {s.name} --> {e.dst_pth} (took {e.time:.2f} seconds)")
 
     if run_metrics:
         v.calculate_ssimulacra2(s)
@@ -100,7 +99,7 @@ def main():
 
     if not dst_pth:
         e.remove_output()
-        print("Discarded encoded video")
+        print(f"Discarded encode {e.dst_pth}")
 
 
 if __name__ == "__main__":

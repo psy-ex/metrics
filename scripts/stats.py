@@ -139,7 +139,6 @@ def main():
 
     for src in src_pth:
         s: CoreVideo = CoreVideo(src, every, threads, use_gpu)
-        print(f"Source video: {s.name}")
 
         print(f"Running encoder at qualities: {quality_list}")
         for q in quality_list:
@@ -147,7 +146,7 @@ def main():
 
             e: VideoEnc = VideoEnc(s, q, enc, enc_args)
             v: DstVideo = e.encode(every, threads, use_gpu)
-            print(f"Encoded video: {e.dst_pth} (took {e.time:.2f} seconds)")
+            print(f"Encoded {s.name} --> {e.dst_pth} (took {e.time:.2f} seconds)")
 
             v.calculate_ssimulacra2(s)
             v.calculate_butteraugli(s)
