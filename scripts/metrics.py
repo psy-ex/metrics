@@ -22,7 +22,7 @@ class CoreVideo:
     size: int
     e: int
     threads: int
-    gpu: bool
+    gpu_streams: int
 
     video_width: int
     video_height: int
@@ -30,13 +30,13 @@ class CoreVideo:
     # VapourSynth video object
     video: VideoNode
 
-    def __init__(self, pth: str, e: int, t: int, g: bool) -> None:
+    def __init__(self, pth: str, e: int, t: int, g: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
         self.e = e
         self.threads = t
-        self.gpu = g
+        self.gpu_streams = g
         self.video = self.vapoursynth_init()
         self.video_width, self.video_height = self.get_video_dimensions()
 
@@ -52,8 +52,10 @@ class CoreVideo:
         """
         core = vs.core
         print(
-            f"Using {self.threads} {'GPU' if self.gpu else 'CPU'} threads for {'SSIMULACRA2 & Butteraugli' if self.gpu else 'SSIMULACRA2'}"
+            f"Using {self.threads} {'GPU' if self.gpu_streams else 'CPU'} threads for {'SSIMULACRA2 & Butteraugli' if self.gpu_streams else 'SSIMULACRA2'}"
         )
+        if self.gpu_streams:
+            print(f"Using {self.gpu_streams} GPU streams for SSIMULACRA2 & Butteraugli")
         core.num_threads = self.threads
         video = core.ffms2.Source(source=self.path, cache=False, threads=self.threads)
         video = initialize_clip(video, bits=0)
@@ -91,14 +93,14 @@ class DstVideo(CoreVideo):
     xpsnr_v: float
     w_xpsnr: float
 
-    def __init__(self, pth: str, e: int, t: int, g: bool) -> None:
+    def __init__(self, pth: str, e: int, t: int, g: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
         self.size = self.get_input_filesize()
         self.e = e
         self.video_width, self.video_height = self.get_video_dimensions()
         self.threads = t
-        self.gpu = g
+        self.gpu_streams = g
         self.video = self.vapoursynth_init()
         self.ssimu2_avg = 0.0
         self.ssimu2_sdv = 0.0
@@ -115,8 +117,10 @@ class DstVideo(CoreVideo):
         Calculate SSIMULACRA2 score between a source video & a distorted video.
         """
 
-        if self.gpu:
-            ssimu2_obj = src.video.vship.SSIMULACRA2(self.video)
+        if self.gpu_streams:
+            ssimu2_obj = src.video.vship.SSIMULACRA2(
+                self.video, numStream=self.gpu_streams
+            )
         else:
             ssimu2_obj = src.video.vszip.Metrics(self.video, [0])
 
@@ -150,8 +154,10 @@ class DstVideo(CoreVideo):
         Calculate Butteraugli score between a source video & a distorted video.
         """
 
-        if self.gpu:
-            butter_obj = src.video.vship.BUTTERAUGLI(self.video)
+        if self.gpu_streams:
+            butter_obj = src.video.vship.BUTTERAUGLI(
+                self.video, numStream=self.gpu_streams
+            )
         else:
             print("Skipping Butteraugli calculation (no GPU threads available)")
             self.butter_dis = 0.0
@@ -370,7 +376,7 @@ class VideoEnc:
         print(" ".join(cmd))
         return cmd
 
-    def encode(self, e: int, t: int, g: bool) -> DstVideo:
+    def encode(self, e: int, t: int, g: int) -> DstVideo:
         """
         Encode the video using FFmpeg piped to your chosen encoder.
         """

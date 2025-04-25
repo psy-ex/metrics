@@ -52,17 +52,17 @@ def main():
     )
     parser.add_argument(
         "-g",
-        "--gpu-threads",
+        "--gpu-streams",
         type=int,
         default=0,
-        help="Number of GPU threads for SSIMULACRA2 & Butteraugli",
+        help="Number of GPU streams for SSIMULACRA2/Butteraugli",
     )
     parser.add_argument(
-        "-c",
-        "--cpu-threads",
+        "-t",
+        "--threads",
         type=int,
         default=0,
-        help="Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)",
+        help="Number of threads for SSIMULACRA2/Butteraugli",
     )
     parser.add_argument(
         "-n", "--no-metrics", action="store_true", help="Skip metrics calculations"
@@ -75,24 +75,24 @@ def main():
     enc: str = args.encoder
     every: int = args.every
     enc_args: list[str] = args.encoder_args
-    threads: int = args.gpu_threads if args.gpu_threads else args.cpu_threads
-    use_gpu: bool = args.gpu_threads > 0
+    threads: int = args.threads
+    gpu_streams: int = args.gpu_streams
     run_metrics: bool = not args.no_metrics
 
-    s: CoreVideo = CoreVideo(src_pth, every, threads, use_gpu)
+    s: CoreVideo = CoreVideo(src_pth, every, threads, gpu_streams)
 
     if dst_pth:
         e: VideoEnc = VideoEnc(s, q, enc, enc_args, dst_pth)
     else:
         e: VideoEnc = VideoEnc(s, q, enc, enc_args)
-    v: DstVideo = e.encode(every, threads, use_gpu)
+    v: DstVideo = e.encode(every, threads, gpu_streams)
     print(f"Encoded {s.name} --> {e.dst_pth} (took {e.time:.2f} seconds)")
 
     if run_metrics:
         v.calculate_ssimulacra2(s)
         v.print_ssimulacra2()
         v.calculate_butteraugli(s)
-        if use_gpu:
+        if gpu_streams:
             v.print_butteraugli()
         v.calculate_xpsnr(s)
         v.print_xpsnr()

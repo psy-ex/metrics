@@ -31,26 +31,26 @@ def main() -> None:
     )
     parser.add_argument(
         "-g",
-        "--gpu-threads",
+        "--gpu-streams",
         type=int,
         default=0,
-        help="Number of GPU threads for SSIMULACRA2 & Butteraugli",
+        help="Number of GPU streams for SSIMULACRA2/Butteraugli",
     )
     parser.add_argument(
-        "-c",
-        "--cpu-threads",
+        "-t",
+        "--threads",
         type=int,
         default=0,
-        help="Number of CPU threads for SSIMULACRA2 (overridden by GPU threads)",
+        help="Number of threads for SSIMULACRA2/Butteraugli",
     )
 
     args: Namespace = parser.parse_args()
     every: int = args.every
-    threads: int = args.gpu_threads if args.gpu_threads else args.cpu_threads
-    use_gpu: bool = args.gpu_threads > 0
+    threads: int = args.threads
+    gpu_streams: int = args.gpu_streams
 
-    s: CoreVideo = CoreVideo(args.source, every, threads, use_gpu)
-    v: DstVideo = DstVideo(args.distorted, every, threads, use_gpu)
+    s: CoreVideo = CoreVideo(args.source, every, threads, gpu_streams)
+    v: DstVideo = DstVideo(args.distorted, every, threads, gpu_streams)
 
     print(f"Source video:    \033[4m{s.name}\033[0m")
     print(f"Distorted video: \033[4m{v.name}\033[0m")
@@ -60,7 +60,7 @@ def main() -> None:
     v.print_ssimulacra2()
 
     # Calculate Butteraugli scores
-    if use_gpu:
+    if gpu_streams:
         v.calculate_butteraugli(s)
         v.print_butteraugli()
     else:

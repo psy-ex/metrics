@@ -1,3 +1,3 @@
-from .metrics import DstVideo, CoreVideo
+from .metrics import CoreVideo, DstVideo
 
 __all__ = ["DstVideo", "CoreVideo"]
