@@ -1,0 +1,36 @@
+FROM archlinux:latest AS base
+# pass GPU_ARCH=$(gpu-arch) to build against your specific GPU
+ARG GPU_ARCH
+
+RUN pacman -Syu --noconfirm
+RUN pacman -S --needed base-devel ffms2 wget make curl vapoursynth git \
+    python jq rocm-hip-sdk rocm-opencl-sdk --noconfirm
+
+ENV PATH="${PATH}:/opt/rocm/bin"
+ENV ROCM_PATH=/opt/rocm
+
+RUN git clone https://github.com/dnjulek/vapoursynth-zip.git --depth 1 --branch R6 && \
+    cd vapoursynth-zip/build-help && \
+    chmod +x build.sh && ./build.sh
+
+# offload-arch=native build wont work; need to pass in specific arch of host machine to compile.
+RUN git clone https://github.com/Line-fr/Vship.git && \
+    cd Vship && \
+    sed -i "s/--offload-arch=native/--offload-arch=${GPU_ARCH}/g" Makefile && \
+    make build && make install
+
+# VENV Setup
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv $VIRTUAL_ENV
+# Enable venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+FROM base AS app
+
+WORKDIR /metrics
+COPY . /metrics
+RUN pip install uv && \
+    uv pip install -e .
+VOLUME ["/videos"]
+WORKDIR /videos
+
+ENTRYPOINT ["uv", "run", "--active"]

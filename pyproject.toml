@@ -14,3 +14,18 @@ dependencies = [
     "vapoursynth>=70",
     "vstools>=3.3.4",
 ]
+
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# specify root package dir
+package-dir = { "" = "scripts" }
+
+
+[project.scripts]
+stats = "stats:main"
+plot = "plot:main"
+scores = "scores:main"
+encode = "encode:main"

@@ -1,0 +1,18 @@
+version: "3.9"
+services:
+  # rocm config
+  metrics-rocm:
+    image: metrics
+    build:
+      context: .
+      dockerfile: Dockerfile.rocm
+      args:
+        - GPU_ARCH=${GPU_ARCH:-native}
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    security_opt:
+      - seccomp:unconfined
+    group_add:
+      - video
+      - render

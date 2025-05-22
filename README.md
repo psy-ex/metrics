@@ -250,6 +250,13 @@ input file accompanied by the corresponding average BD-rate. These statistics
 can assist in looking at overall encoder efficiency across multiple speed
 presets or configurations.
 
+### Run via Docker
+<i> See the pre-requisites for host machine: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html </i>
+1. Build Image - build specifically against your GPU's Architechture
+`GPU_ARCH=$(amdgpu-arch) docker-compose --build`
+2. Run
+`docker-compose -f <docker-compose-file> run -v <host-path>:/videos metrics-rocm <scores|plot|encode|stats> <..args>`
+
 ## License
 
 This project was originally authored by @gianni-rosato & is provided as FOSS
