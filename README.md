@@ -10,8 +10,10 @@ codecs using metrics such as:
 - VMAF NEG (Harmonic Mean)
 - VMAF
 - SSIM
-- PSNR We include modules for processing video files, running video encoding,
-  and generating both numerical and visual reports from quality metrics.
+- PSNR
+
+We include modules for processing video files, running video encoding, and
+generating both numerical and visual reports from quality metrics.
 
 The four main scripts are:
 
