@@ -93,6 +93,19 @@ class DstVideo(CoreVideo):
     xpsnr_v: float
     w_xpsnr: float
 
+    # VMAF scores
+    vmaf: float
+    vmaf_neg_hmn: float
+
+    # SSIM score
+    ssim: float
+
+    # PSNR score
+    psnr: float
+
+    # Average VMAF, SSIM, PSNR
+    svt_triple: float
+
     def __init__(self, pth: str, e: int, t: int, g: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
@@ -111,6 +124,11 @@ class DstVideo(CoreVideo):
         self.xpsnr_u = 0.0
         self.xpsnr_v = 0.0
         self.w_xpsnr = 0.0
+        self.vmaf = 0.0
+        self.vmaf_neg_hmn = 0.0
+        self.ssim = 0.0
+        self.psnr = 0.0
+        self.svt_triple = 0.0
 
     def calculate_ssimulacra2(self, src: CoreVideo) -> None:
         """
@@ -186,43 +204,70 @@ class DstVideo(CoreVideo):
         self.butter_dis = sum(butter_distance_list) / len(butter_distance_list)
         self.butter_mds = max(butter_distance_list)
 
-    def calculate_xpsnr(self, src: CoreVideo) -> None:
+    def calculate_ffmpeg_metrics(self, src: CoreVideo) -> None:
         """
-        Calculate XPSNR scores between a source video & a distorted video using FFmpeg.
+        Calculate XPSNR, SSIM, PSNR, VMAF & VMAF-NEG scores between a source
+        video & a distorted video with FFmpeg.
         """
+
+        filtergraph: str = (
+            "[0:v]split=5[dst0][dst1][dst2][dst3][dst4];"
+            "[1:v]split=5[src0][src1][src2][src3][src4];"
+            "[dst0][src0]ssim;"
+            "[dst1][src1]psnr;"
+            "[src2][dst2]xpsnr=shortest=1;"
+            f"[dst3][src3]libvmaf=model='version=vmaf_v0.6.1':n_threads={self.threads}:n_subsample={self.e};"
+            f"[dst4][src4]libvmaf=model='version=vmaf_v0.6.1neg':n_threads={self.threads}:n_subsample={self.e}:pool=harmonic_mean"
+        )
 
         cmd: list[str] = [
             "ffmpeg",
+            "-threads",
+            str(self.threads),
+            "-hide_banner",
             "-i",
             self.path,
             "-i",
             src.path,
-            "-hide_banner",
             "-lavfi",
-            "xpsnr=shortest=1",
+            filtergraph,
             "-f",
             "null",
             "-",
         ]
 
-        print("Calculating XPSNR scores...")
+        print("Calculating XPSNR, SSIM, PSNR, VMAF & VMAF-NEG scores...")
         process: Popen[str] = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            text=True,
         )
+        _, stderr_output = process.communicate()
 
-        _, stderr = process.communicate()
+        ssim_match = re.search(
+            r"\[Parsed_ssim_2\s*@\s*.*?\]\s*SSIM.*?All:(\d+\.\d+)",
+            stderr_output,
+        )
+        if ssim_match:
+            self.ssim = float(ssim_match.group(1)) * 100
 
-        # Parse XPSNR scores using regex
-        rgx: str = r"XPSNR\s+y:\s*(\d+\.\d+)\s+u:\s*(\d+\.\d+)\s+v:\s*(\d+\.\d+)"
-        match = re.search(rgx, stderr)
-        if match:
-            self.xpsnr_y = float(match.group(1))
-            self.xpsnr_u = float(match.group(2))
-            self.xpsnr_v = float(match.group(3))
-        else:
-            self.xpsnr_y = 0.0
-            self.xpsnr_u = 0.0
-            self.xpsnr_v = 0.0
+        psnr_match = re.search(
+            r"\[Parsed_psnr_3\s*@\s*.*?\]\s*PSNR\s+y:([\d\.]+)\s+u:([\d\.]+)\s+v:([\d\.]+)\s+average:([\d\.]+)\s+min:([\d\.]+)\s+max:([\d\.]+)",
+            stderr_output,
+        )
+        if psnr_match:
+            self.psnr = float(psnr_match.group(4))
+
+        xpsnr_match = re.search(
+            r"\[Parsed_xpsnr_4\s*@\s*.*?\]\s*XPSNR\s+y:\s*(\d+\.\d+)\s+u:\s*(\d+\.\d+)\s+v:\s*(\d+\.\d+)",
+            stderr_output,
+        )
+        if xpsnr_match:
+            self.xpsnr_y = float(xpsnr_match.group(1))
+            self.xpsnr_u = float(xpsnr_match.group(2))
+            self.xpsnr_v = float(xpsnr_match.group(3))
 
         maxval: int = 255
         xpsnr_mse_y: float = psnr_to_mse(self.xpsnr_y, maxval)
@@ -230,6 +275,20 @@ class DstVideo(CoreVideo):
         xpsnr_mse_v: float = psnr_to_mse(self.xpsnr_v, maxval)
         w_xpsnr_mse: float = ((4.0 * xpsnr_mse_y) + xpsnr_mse_u + xpsnr_mse_v) / 6.0
         self.w_xpsnr = 10.0 * math.log10((maxval**2) / w_xpsnr_mse)
+
+        vmaf_score_pattern = (
+            r"\[Parsed_libvmaf_([56])\s*@\s*.*?\]\s*VMAF score:\s*(\d+\.\d+)"
+        )
+        all_vmaf_matches: list[str] = re.findall(vmaf_score_pattern, stderr_output)
+        for filter_idx, score_str in all_vmaf_matches:
+            score = float(score_str)
+            match filter_idx:
+                case "5":
+                    self.vmaf = score
+                case "6":
+                    self.vmaf_neg_hmn = score
+
+        self.svt_triple = statistics.mean([self.vmaf, self.ssim, self.psnr])
 
     def print_ssimulacra2(self) -> None:
         """
@@ -252,15 +311,22 @@ class DstVideo(CoreVideo):
         print(f" Distance:      \033[1m{self.butter_dis:.5f}\033[0m")
         print(f" Max Distance:  \033[1m{self.butter_mds:.5f}\033[0m")
 
-    def print_xpsnr(self) -> None:
+    def print_ffmpeg_metrics(self) -> None:
         """
-        Print XPSNR scores.
+        Print XPSNR, SSIM, PSNR, VMAF & VMAF-NEG scores.
         """
         print("\033[91mXPSNR\033[0m scores:")
-        print(f" XPSNR Y:       \033[1m{self.xpsnr_y:.5f}\033[0m")
-        print(f" XPSNR U:       \033[1m{self.xpsnr_u:.5f}\033[0m")
-        print(f" XPSNR V:       \033[1m{self.xpsnr_v:.5f}\033[0m")
+        print(f" XPSNR:         \033[1m{self.xpsnr_y:.5f}\033[0m")
         print(f" W-XPSNR:       \033[1m{self.w_xpsnr:.5f}\033[0m")
+        print(
+            f"\033[38;5;208mVMAF\033[0m scores for every \033[95m{self.e}\033[0m frame:"
+        )
+        print(f" VMAF NEG:      \033[1m{self.vmaf_neg_hmn:.5f}\033[0m")
+        print(f" VMAF:          \033[1m{self.vmaf:.5f}\033[0m")
+        print(f"SSIM Score:     \033[1m{self.ssim:.5f}\033[0m")
+        print(f"PSNR Score:     \033[1m{self.psnr:.5f}\033[0m")
+        print("AVG VMAF/SSIM/PSNR score:")
+        print(f"                \033[1m{self.svt_triple:.5f}\033[0m")
 
 
 class VideoEnc:

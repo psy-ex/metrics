@@ -25,6 +25,10 @@ def write_stats(
     ssimu2_mean: float,
     butter_distance: float,
     w_xpsnr: float,
+    vmaf_neg: float,
+    vmaf: float,
+    ssim: float,
+    psnr: float,
 ) -> None:
     """
     Write metric stats to a CSV file.
@@ -34,21 +38,21 @@ def write_stats(
     if not os.path.exists(csv):
         with open(csv, "w") as f:
             f.write(
-                "q,encode_time,output_filesize,ssimu2_mean,butter_distance,wxpsnr\n"
+                "q,encode_time,output_filesize,ssimu2_mean,butter_distance,wxpsnr,vmaf_neg,vmaf,ssim,psnr\n"
             )
             f.write(
-                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
+                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f},{vmaf_neg:.5f},{vmaf:.5f},{ssim:.5f},{psnr:.5f}\n"
             )
     else:
         with open(csv, "a") as f:
             f.write(
-                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f}\n"
+                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f},{vmaf_neg:.5f},{vmaf:.5f},{ssim:.5f},{psnr:.5f}\n"
             )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes."
+        description="Generate statistics for a series of video encodes."
     )
     parser.add_argument(
         "-i",
@@ -135,6 +139,18 @@ def main():
     cumulative_wxpsnr: list[dict[int, float]] = [
         {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
     ]
+    cumulative_vmafneg: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    cumulative_vmaf: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    cumulative_ssim: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    cumulative_psnr: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
     i: int = 0
 
     for src in src_pth:
@@ -150,13 +166,17 @@ def main():
 
             v.calculate_ssimulacra2(s)
             v.calculate_butteraugli(s)
-            v.calculate_xpsnr(s)
+            v.calculate_ffmpeg_metrics(s)
 
             cumulative_times[i][q] = e.time
             cumulative_sizes[i][q] = v.size
             cumulative_ssimu2[i][q] = v.ssimu2_avg
             cumulative_butter[i][q] = v.butter_dis
             cumulative_wxpsnr[i][q] = v.w_xpsnr
+            cumulative_vmafneg[i][q] = v.vmaf_neg_hmn
+            cumulative_vmaf[i][q] = v.vmaf
+            cumulative_ssim[i][q] = v.ssim
+            cumulative_psnr[i][q] = v.psnr
 
             if clean:
                 e.remove_output()
@@ -167,6 +187,10 @@ def main():
     avg_ssimu2: dict[int, float] = {}
     avg_butter: dict[int, float] = {}
     avg_wxpsnr: dict[int, float] = {}
+    avg_vmafneg: dict[int, float] = {}
+    avg_vmaf: dict[int, float] = {}
+    avg_ssim: dict[int, float] = {}
+    avg_psnr: dict[int, float] = {}
 
     for q in quality_list:
         avg_time[q] = sum(cumulative_times[j][q] for j in range(i)) / i
@@ -174,6 +198,10 @@ def main():
         avg_ssimu2[q] = sum(cumulative_ssimu2[j][q] for j in range(i)) / i
         avg_butter[q] = sum(cumulative_butter[j][q] for j in range(i)) / i
         avg_wxpsnr[q] = sum(cumulative_wxpsnr[j][q] for j in range(i)) / i
+        avg_vmafneg[q] = sum(cumulative_vmafneg[j][q] for j in range(i)) / i
+        avg_vmaf[q] = sum(cumulative_vmaf[j][q] for j in range(i)) / i
+        avg_ssim[q] = sum(cumulative_ssim[j][q] for j in range(i)) / i
+        avg_psnr[q] = sum(cumulative_psnr[j][q] for j in range(i)) / i
         write_stats(
             csv_out,
             q,
@@ -182,6 +210,10 @@ def main():
             avg_ssimu2[q],
             avg_butter[q],
             avg_wxpsnr[q],
+            avg_vmafneg[q],
+            avg_vmaf[q],
+            avg_ssim[q],
+            avg_psnr[q],
         )
 
 

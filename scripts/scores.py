@@ -67,8 +67,8 @@ def main() -> None:
         v.calculate_butteraugli(s)
 
     # Calculate XPSNR scores
-    v.calculate_xpsnr(s)
-    v.print_xpsnr()
+    v.calculate_ffmpeg_metrics(s)
+    v.print_ffmpeg_metrics()
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ from metrics import CoreVideo, DstVideo, VideoEnc
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a single video encode."
+        description="Generate statistics for a single video encode."
     )
     parser.add_argument(
         "-i", "--input", required=True, type=str, help="Path to source video file"
@@ -94,8 +94,8 @@ def main():
         v.calculate_butteraugli(s)
         if gpu_streams:
             v.print_butteraugli()
-        v.calculate_xpsnr(s)
-        v.print_xpsnr()
+        v.calculate_ffmpeg_metrics(s)
+        v.print_ffmpeg_metrics()
 
     if not dst_pth:
         e.remove_output()

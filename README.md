@@ -2,9 +2,16 @@
 
 The Psychovisual Experts group presents `metrics`, a video quality assessment
 toolkit that provides a suite of scripts for measuring and comparing video
-codecs using metrics such as SSIMULACRA2, Butteraugli (3pnorm), and XPSNR. The
-project includes modules for processing video files, running video encoding, and
-generating both numerical and visual reports from quality metrics.
+codecs using metrics such as:
+
+- Average SSIMULACRA2 across frames
+- Average Butteraugli (3pnorm) across frames
+- Weighted XPSNR
+- VMAF NEG (Harmonic Mean)
+- VMAF
+- SSIM
+- PSNR We include modules for processing video files, running video encoding,
+  and generating both numerical and visual reports from quality metrics.
 
 The four main scripts are:
 
@@ -32,10 +39,7 @@ Read more below on how to install and use these utilities.
 PSY-EX Metrics enables you to:
 
 - Encode videos using various codecs (e.g., x264, x265, svtav1, aomenc).
-- Calculate visual quality & distance metrics, such as:
-  - SSIMULACRA2
-  - Butteraugli
-  - Weighted XPSNR
+- Calculate various metrics.
 - Generate CSV files with computed metric statistics for further analysis.
 - Visualize the metrics side-by-side, comparing codec results through
   customizable plots.
@@ -46,7 +50,7 @@ PSY-EX Metrics enables you to:
 
 - [uv](https://github.com/astral-sh/uv/blob/main/README.md), a Python project
   manager
-- FFmpeg >= 7.1 (for XPSNR calculations)
+- FFmpeg >= 7.1 (required for XPSNR)
 - VapourSynth, and required plugins:
   - ffms2
   - [vszip](https://github.com/dnjulek/vapoursynth-zip)
@@ -114,7 +118,7 @@ every 3rd frame.
 % ./encode.py --help
 usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-g GPU_STREAMS] [-t THREADS] [-n] {x264,x265,svtav1,aomenc} ...
 
-Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a single video encode.
+Generate statistics for a single video encode.
 
 positional arguments:
   {x264,x265,svtav1,aomenc}
@@ -156,7 +160,7 @@ This command does the same as the previous command, but uses 4 GPU streams
 ```bash
 usage: stats.py [-h] -i INPUTS [INPUTS ...] -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_STREAMS] [-t THREADS] [-k] {x264,x265,svtav1,aomenc} ...
 
-Generate SSIMULACRA2, Butteraugli, and XPSNR statistics for a series of video encodes.
+Generate statistics for a series of video encodes.
 
 positional arguments:
   {x264,x265,svtav1,aomenc}
@@ -234,8 +238,7 @@ Example:
 ```
 
 This command reads `codec1_results.csv` and `codec2_results.csv`, generating
-separate plots (one for each metric: SSIMULACRA2, Butteraugli, and XPSNR) as
-WebP images.
+separate plots (one for each metric) as WebP images.
 
 It will also print BD-rate statistics for each metric, comparing the two results
 from the CSV files.
