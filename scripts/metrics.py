@@ -177,7 +177,7 @@ class DstVideo(CoreVideo):
                 self.video, numStream=self.gpu_streams
             )
         else:
-            print("Skipping Butteraugli calculation (no GPU threads available)")
+            print("Skipping Butteraugli, no GPU threads available (set with -g)")
             self.butter_dis = 0.0
             self.butter_mds = 0.0
             return
