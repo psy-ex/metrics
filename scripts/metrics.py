@@ -215,7 +215,7 @@ class DstVideo(CoreVideo):
             "[1:v]split=5[src0][src1][src2][src3][src4];"
             "[dst0][src0]ssim;"
             "[dst1][src1]psnr;"
-            "[src2][dst2]xpsnr=shortest=1;"
+            "[dst2][src2]xpsnr=shortest=1;"
             f"[dst3][src3]libvmaf=model='version=vmaf_v0.6.1':n_threads={self.threads}:n_subsample={self.e};"
             f"[dst4][src4]libvmaf=model='version=vmaf_v0.6.1neg':n_threads={self.threads}:n_subsample={self.e}:pool=harmonic_mean"
         )
