@@ -20,7 +20,7 @@ The four main scripts are:
 - `scores.py`: Compute detailed quality scores for a given source/distorted
   video pair.
 - `encode.py`: Encode videos using various codecs (e.g., x264, x265, svtav1,
-  aomenc) and print metrics.
+  aomenc, libvpx/VP9) and print metrics.
 - `stats.py`: Encode videos at various quality settings and log metric
   statistics to a CSV file.
 - `plot.py`: Generate visual plots from CSV metric data for side-by-side codec
@@ -40,7 +40,8 @@ Read more below on how to install and use these utilities.
 
 PSY-EX Metrics enables you to:
 
-- Encode videos using various codecs (e.g., x264, x265, svtav1, aomenc).
+- Encode videos using various codecs (e.g., x264, x265, svtav1, aomenc,
+  libvpx/VP9).
 - Calculate various metrics.
 - Generate CSV files with computed metric statistics for further analysis.
 - Visualize the metrics side-by-side, comparing codec results through
@@ -118,12 +119,12 @@ every 3rd frame.
 
 ```bash
 % ./encode.py --help
-usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-g GPU_STREAMS] [-t THREADS] [-n] {x264,x265,svtav1,aomenc} ...
+usage: encode.py [-h] -i INPUT -q QUALITY [-b KEEP] [-e EVERY] [-g GPU_STREAMS] [-t THREADS] [-n] {x264,x265,svtav1,aomenc,vpxenc} ...
 
 Generate statistics for a single video encode.
 
 positional arguments:
-  {x264,x265,svtav1,aomenc}
+  {x264,x265,svtav1,aomenc,vpxenc}
                         Which video encoder to use
   encoder_args          Additional encoder arguments (pass these after a '--' delimiter)
 
@@ -160,12 +161,12 @@ This command does the same as the previous command, but uses 4 GPU streams
 ### stats.py
 
 ```bash
-usage: stats.py [-h] -i INPUTS [INPUTS ...] -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_STREAMS] [-t THREADS] [-k] {x264,x265,svtav1,aomenc} ...
+usage: stats.py [-h] -i INPUTS [INPUTS ...] -q QUALITY -o OUTPUT [-e EVERY] [-g GPU_STREAMS] [-t THREADS] [-k] {x264,x265,svtav1,aomenc,vpxenc} ...
 
 Generate statistics for a series of video encodes.
 
 positional arguments:
-  {x264,x265,svtav1,aomenc}
+  {x264,x265,svtav1,aomenc,vpxenc}
                         Which video encoder to use
   encoder_args          Additional encoder arguments (pass these after a '--' delimiter)
 
@@ -218,6 +219,17 @@ This snippet here will run the same command as before, but across all speed
 presets from 2 to 6 (naming the output CSV files accordingly). It will also
 encode all of the files ending in `.y4m` in the `~/Videos/reference` directory.
 
+You can also use libvpx for VP9 benchmarking:
+
+```bash
+./stats.py \
+  -i source.mkv \
+  -q "20 25 30 35 40" \
+  -o ./libvpx_vp9.csv \
+  -g 4 \
+  vpxenc -- --cpu-used=4
+```
+
 ### plot.py
 
 ```bash
@@ -251,11 +263,20 @@ can assist in looking at overall encoder efficiency across multiple speed
 presets or configurations.
 
 ### Run via Docker
-<i> See the pre-requisites for host machine: https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html </i>
-1. Build Image - build specifically against your GPU's Architechture
-`GPU_ARCH=$(amdgpu-arch) docker-compose --build`
-2. Run
-`docker-compose -f <docker-compose-file> run -v <host-path>:/videos metrics-rocm <scores|plot|encode|stats> <..args>`
+
+<i> See the pre-requisites for host machine:
+https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html
+</i>
+
+1. Build image against your GPU architechture:
+   ```bash
+   GPU_ARCH=$(amdgpu-arch) docker-compose --build
+   ```
+
+2. Run `docker-compose`:
+   ```bash
+   docker-compose -f <docker-compose-file> run -v <host-path>:/videos metrics-rocm <scores|plot|encode|stats> <..args>
+   ```
 
 ## License
 

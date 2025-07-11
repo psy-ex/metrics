@@ -368,6 +368,8 @@ class VideoEnc:
                     self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.265"
                 case "vvenc":
                     self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.266"
+                case "vpxenc":
+                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
                 case _:
                     self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
         else:
@@ -378,6 +380,8 @@ class VideoEnc:
                     self.dst_pth = self.dst_pth + ".265"
                 case "vvenc":
                     self.dst_pth = self.dst_pth + ".266"
+                case "vpxenc":
+                    self.dst_pth = self.dst_pth + ".ivf"
                 case _:
                     self.dst_pth = self.dst_pth + ".ivf"
 
@@ -424,6 +428,18 @@ class VideoEnc:
                     "--crf",
                     f"{self.q}",
                 ]
+            case "vpxenc":
+                cmd: list[str] = [
+                    "vpxenc",
+                    "--codec=vp9",
+                    "--ivf",
+                    "--end-usage=q",
+                    "--bit-depth=10",
+                    "--input-bit-depth=10",
+                    "--profile=2",
+                    "--passes=1",
+                    f"--cq-level={self.q}",
+                ]
             case _:  # "aomenc":
                 cmd: list[str] = [
                     "aomenc",
@@ -439,6 +455,9 @@ class VideoEnc:
 
         if self.encoder_args != [""]:
             cmd.extend(self.encoder_args)
+        if self.encoder == "vpxenc":
+            extra_args: list[str] = ["-o", f"{self.dst_pth}", "-"]
+            cmd.extend(extra_args)
         print(" ".join(cmd))
         return cmd
 
