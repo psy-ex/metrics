@@ -14,7 +14,7 @@ import argparse
 import os
 from argparse import Namespace
 
-from .metrics import CoreVideo, DstVideo, VideoEnc
+from metrics import CoreVideo, DstVideo, VideoEnc
 
 
 def write_stats(
