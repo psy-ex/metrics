@@ -13,7 +13,7 @@
 import argparse
 from argparse import Namespace
 
-from metrics import CoreVideo, DstVideo
+from .metrics import CoreVideo, DstVideo
 
 
 def main() -> None:
