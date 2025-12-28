@@ -5,11 +5,9 @@ import statistics
 import subprocess
 import time
 from subprocess import Popen
+import shlex
 
-import vapoursynth as vs
 from tqdm import tqdm
-from vapoursynth import VideoNode
-from vstools import initialize_clip
 
 
 class CoreVideo:
@@ -27,9 +25,6 @@ class CoreVideo:
     video_width: int
     video_height: int
 
-    # VapourSynth video object
-    video: VideoNode
-
     def __init__(self, pth: str, e: int, t: int, g: int) -> None:
         self.path = pth
         self.name = os.path.basename(pth)
@@ -37,40 +32,38 @@ class CoreVideo:
         self.e = e
         self.threads = t
         self.gpu_streams = g
-        self.video = self.vapoursynth_init()
         self.video_width, self.video_height = self.get_video_dimensions()
 
     def get_input_filesize(self) -> int:
         """
-        Get the input file size of the distorted video.
+        Get the filesize of the input video in bytes.
         """
         return os.path.getsize(self.path)
 
-    def vapoursynth_init(self) -> VideoNode:
-        """
-        Initialize VapourSynth video object for the distorted video.
-        """
-        core = vs.core
-        print(
-            f"Using {self.threads} {'GPU' if self.gpu_streams else 'CPU'} threads for {'SSIMULACRA2 & Butteraugli' if self.gpu_streams else 'SSIMULACRA2'}"
-        )
-        if self.gpu_streams:
-            print(f"Using {self.gpu_streams} GPU streams for SSIMULACRA2 & Butteraugli")
-        core.num_threads = self.threads
-        video = core.ffms2.Source(source=self.path, cache=False, threads=self.threads)
-        video = initialize_clip(video, bits=0)
-        video = video.resize.Bicubic(format=vs.RGBS)
-        if self.e > 1:
-            video = video.std.SelectEvery(cycle=self.e, offsets=0)
-        return video
-
     def get_video_dimensions(self) -> tuple[int, int]:
         """
-        Get the width & height of the distorted video.
+        Get the width & height of the video using ffprobe.
         """
-        core = vs.core
-        src_data = core.ffms2.Source(source=self.path, cache=False, threads=int(-1))
-        return (src_data.width, src_data.height)
+        cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height",
+            "-of",
+            "csv=s=x:p=0",
+            self.path,
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            dimensions = result.stdout.strip().split("x")
+            if len(dimensions) == 2:
+                return int(dimensions[0]), int(dimensions[1])
+        except Exception:
+            pass
+        return 0, 0
 
 
 class DstVideo(CoreVideo):
@@ -86,6 +79,11 @@ class DstVideo(CoreVideo):
     # Butteraugli scores
     butter_dis: float
     butter_mds: float
+
+    # CVVDP scores
+    cvvdp_avg: float
+    cvvdp_sdv: float
+    cvvdp_p10: float
 
     # XPSNR scores
     xpsnr_y: float
@@ -107,19 +105,15 @@ class DstVideo(CoreVideo):
     svt_triple: float
 
     def __init__(self, pth: str, e: int, t: int, g: int) -> None:
-        self.path = pth
-        self.name = os.path.basename(pth)
-        self.size = self.get_input_filesize()
-        self.e = e
-        self.video_width, self.video_height = self.get_video_dimensions()
-        self.threads = t
-        self.gpu_streams = g
-        self.video = self.vapoursynth_init()
+        super().__init__(pth, e, t, g)
         self.ssimu2_avg = 0.0
         self.ssimu2_sdv = 0.0
         self.ssimu2_p10 = 0.0
         self.butter_dis = 0.0
         self.butter_mds = 0.0
+        self.cvvdp_avg = 0.0
+        self.cvvdp_sdv = 0.0
+        self.cvvdp_p10 = 0.0
         self.xpsnr_y = 0.0
         self.xpsnr_u = 0.0
         self.xpsnr_v = 0.0
@@ -130,79 +124,118 @@ class DstVideo(CoreVideo):
         self.psnr = 0.0
         self.svt_triple = 0.0
 
-    def calculate_ssimulacra2(self, src: CoreVideo) -> None:
+    def _run_ffvship(
+        self, src: CoreVideo, metric: str, extra_args: list[str] | None = None
+    ) -> list[float]:
         """
-        Calculate SSIMULACRA2 score between a source video & a distorted video.
+        Run FFVship for a specific metric and return a list of per-frame scores.
         """
+        cmd = [
+            "FFVship",
+            "-s",
+            src.path,
+            "-e",
+            self.path,
+            "-m",
+            metric,
+            "-g",
+            str(self.gpu_streams),
+            "-t",
+            str(self.threads),
+            "--every",
+            str(self.e),
+            "--live-score-output",
+        ]
+        if extra_args:
+            cmd.extend(extra_args)
 
-        if self.gpu_streams:
-            ssimu2_obj = src.video.vship.SSIMULACRA2(
-                self.video, numStream=self.gpu_streams
-            )
-        else:
-            ssimu2_obj = src.video.vszip.Metrics(self.video, [0])
+        scores: list[float] = []
 
-        ssimu2_list: list[float] = []
-        with tqdm(
-            total=ssimu2_obj.num_frames,
-            desc="Calculating SSIMULACRA2 scores",
-            unit=" frame",
-            colour="blue",
-        ) as pbar:
-            for i, f in enumerate(ssimu2_obj.frames()):
-                ssimu2_list.append(f.props["_SSIMULACRA2"])
-                pbar.update(1)
-                if not i % 24:
-                    avg: float = sum(ssimu2_list) / len(ssimu2_list)
-                    pbar.set_postfix(
-                        {
-                            "avg": f"{avg:.2f}",
-                        }
-                    )
+        # Try to get frame count for tqdm
+        total_frames = 0
+        ffprobe_cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=nb_frames",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            src.path,
+        ]
+        try:
+            res = subprocess.run(ffprobe_cmd, capture_output=True, text=True)
+            total_frames = int(res.stdout.strip()) // self.e
+        except Exception:
+            total_frames = 0
 
-        self.ssimu2_avg, self.ssimu2_sdv, self.ssimu2_p10 = calc_some_scores(
-            ssimu2_list
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
         )
 
-    def calculate_butteraugli(
-        self,
-        src: CoreVideo,
-    ) -> None:
-        """
-        Calculate Butteraugli score between a source video & a distorted video.
-        """
+        desc_map = {
+            "SSIMULACRA2": "Calculating SSIMULACRA2 scores",
+            "Butteraugli": "Calculating Butteraugli scores",
+            "CVVDP": "Calculating CVVDP scores",
+        }
+        color_map = {
+            "SSIMULACRA2": "blue",
+            "Butteraugli": "yellow",
+            "CVVDP": "green",
+        }
 
-        if self.gpu_streams:
-            butter_obj = src.video.vship.BUTTERAUGLI(
-                self.video, numStream=self.gpu_streams
-            )
-        else:
-            print("Skipping Butteraugli, no GPU threads available (set with -g)")
-            self.butter_dis = 0.0
-            self.butter_mds = 0.0
-            return
-
-        butter_distance_list: list[float] = []
         with tqdm(
-            total=butter_obj.num_frames,
-            desc="Calculating Butteraugli scores",
+            total=total_frames if total_frames > 0 else None,
+            desc=desc_map.get(metric, f"Calculating {metric} scores"),
             unit=" frame",
-            colour="yellow",
+            colour=color_map.get(metric, "white"),
         ) as pbar:
-            for i, f in enumerate(butter_obj.frames()):
-                d: float = f.props["_BUTTERAUGLI_3Norm"]
-                butter_distance_list.append(d)
-                pbar.update(1)
-                if not i % 24:
-                    dis: float = sum(butter_distance_list) / len(butter_distance_list)
-                    pbar.set_postfix(
-                        {
-                            "dis": f"{dis:.2f}",
-                        }
-                    )
+            if process.stdout:
+                for line in process.stdout:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        parts = line.split()
+                        if len(parts) == 2:
+                            score = float(parts[1])
+                            scores.append(score)
+                            pbar.update(1)
+                            if len(scores) % 24 == 0:
+                                avg = sum(scores) / len(scores)
+                                pbar.set_postfix({"avg": f"{avg:.2f}"})
+                    except ValueError:
+                        pass
+        process.wait()
+        return scores
 
-        self.butter_dis = sum(butter_distance_list) / len(butter_distance_list)
-        self.butter_mds = max(butter_distance_list)
+    def calculate_ssimulacra2(self, src: CoreVideo) -> None:
+        """
+        Calculate SSIMULACRA2 score between a source video & a distorted video using FFVship.
+        """
+        scores = self._run_ffvship(src, "SSIMULACRA2")
+        if scores:
+            self.ssimu2_avg, self.ssimu2_sdv, self.ssimu2_p10 = calc_some_scores(scores)
+
+    def calculate_butteraugli(self, src: CoreVideo) -> None:
+        """
+        Calculate Butteraugli score between a source video & a distorted video using FFVship.
+        """
+        # Use --qnorm 3 to match previous behavior (3pnorm)
+        scores = self._run_ffvship(src, "Butteraugli", ["--qnorm", "3"])
+        if scores:
+            self.butter_dis = sum(scores) / len(scores)
+            self.butter_mds = max(scores)
+
+    def calculate_cvvdp(self, src: CoreVideo) -> None:
+        """
+        Calculate CVVDP score between a source video & a distorted video using FFVship.
+        """
+        scores = self._run_ffvship(src, "CVVDP")
+        if scores:
+            self.cvvdp_avg, self.cvvdp_sdv, self.cvvdp_p10 = calc_some_scores(scores)
 
     def calculate_ffmpeg_metrics(self, src: CoreVideo) -> None:
         """
@@ -294,226 +327,186 @@ class DstVideo(CoreVideo):
         """
         Print SSIMULACRA2 scores.
         """
-        print(
-            f"\033[94mSSIMULACRA2\033[0m scores for every \033[95m{self.e}\033[0m frame:"
-        )
-        print(f" Average:       \033[1m{self.ssimu2_avg:.5f}\033[0m")
-        print(f" Std Deviation: \033[1m{self.ssimu2_sdv:.5f}\033[0m")
-        print(f" 10th Pctile:   \033[1m{self.ssimu2_p10:.5f}\033[0m")
+        print(f"SSIMULACRA2 Average:       \033[1m{self.ssimu2_avg:.5f}\033[0m")
+        print(f"SSIMULACRA2 Std Dev:       {self.ssimu2_sdv:.5f}")
+        print(f"SSIMULACRA2 10th %:        {self.ssimu2_p10:.5f}")
 
     def print_butteraugli(self) -> None:
         """
         Print Butteraugli scores.
         """
-        print(
-            f"\033[93mButteraugli\033[0m scores for every \033[95m{self.e}\033[0m frame:"
-        )
-        print(f" Distance:      \033[1m{self.butter_dis:.5f}\033[0m")
-        print(f" Max Distance:  \033[1m{self.butter_mds:.5f}\033[0m")
+        print(f"Butteraugli Distance:      \033[1m{self.butter_dis:.5f}\033[0m")
+        print(f"Butteraugli Max Distance:  {self.butter_mds:.5f}")
+
+    def print_cvvdp(self) -> None:
+        """
+        Print CVVDP scores.
+        """
+        print(f"CVVDP Average:             \033[1m{self.cvvdp_avg:.5f}\033[0m")
+        print(f"CVVDP Std Dev:             {self.cvvdp_sdv:.5f}")
+        print(f"CVVDP 10th %:              {self.cvvdp_p10:.5f}")
 
     def print_ffmpeg_metrics(self) -> None:
         """
         Print XPSNR, SSIM, PSNR, VMAF & VMAF-NEG scores.
         """
-        print("\033[91mXPSNR\033[0m scores:")
-        print(f" XPSNR:         \033[1m{self.xpsnr_y:.5f}\033[0m")
-        print(f" W-XPSNR:       \033[1m{self.w_xpsnr:.5f}\033[0m")
-        print(
-            f"\033[38;5;208mVMAF\033[0m scores for every \033[95m{self.e}\033[0m frame:"
-        )
-        print(f" VMAF NEG:      \033[1m{self.vmaf_neg_hmn:.5f}\033[0m")
-        print(f" VMAF:          \033[1m{self.vmaf:.5f}\033[0m")
-        print(f"SSIM Score:     \033[1m{self.ssim:.5f}\033[0m")
-        print(f"PSNR Score:     \033[1m{self.psnr:.5f}\033[0m")
-        print("AVG VMAF/SSIM/PSNR score:")
-        print(f"                \033[1m{self.svt_triple:.5f}\033[0m")
+        print(f"W-XPSNR:                   \033[1m{self.w_xpsnr:.5f}\033[0m")
+        print(f"VMAF NEG (Harmonic Mean):  \033[1m{self.vmaf_neg_hmn:.5f}\033[0m")
+        print(f"VMAF:                      \033[1m{self.vmaf:.5f}\033[0m")
+        print(f"SSIM:                      \033[1m{self.ssim:.5f}\033[0m")
+        print(f"PSNR:                      \033[1m{self.psnr:.5f}\033[0m")
+        print(f"SVT Triple:                \033[1m{self.svt_triple:.5f}\033[0m")
 
 
 class VideoEnc:
     """
-    Video encoding class, containing encoder commands.
+    Video encoder class.
     """
 
     src: CoreVideo
-    dst_pth: str
     q: int
-    encoder: str
-    encoder_args: list[str]
-    enc_cmd: list[str]
+    enc: str
+    enc_args: list[str]
+    dst_pth: str
     time: float
 
     def __init__(
         self,
         src: CoreVideo,
         q: int,
-        encoder: str,
-        encoder_args: list[str],
-        dst_pth: str = "",
+        enc: str,
+        enc_args: list[str],
+        dst_pth: str | None = None,
     ) -> None:
         self.src = src
-        self.dst_pth = dst_pth
         self.q = q
-        self.encoder = encoder
-        self.encoder_args = encoder_args if encoder_args else [""]
-        self.enc_cmd = self.set_enc_cmd()
-        self.time = 0
+        self.enc = enc
+        self.enc_args = enc_args
+        if dst_pth:
+            self.dst_pth = dst_pth
+        else:
+            ext = {
+                "x264": "mp4",
+                "x265": "mp4",
+                "svtav1": "ivf",
+                "aomenc": "ivf",
+                "vpxenc": "webm",
+            }.get(enc, "mp4")
+            self.dst_pth = f"{os.path.splitext(src.name)[0]}_{q}.{ext}"
 
     def set_enc_cmd(self) -> list[str]:
-        p: str = os.path.splitext(os.path.basename(self.src.path))[0]
-        if not self.dst_pth:
-            match self.encoder:
-                case "x264":
-                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.264"
-                case "x265":
-                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.265"
-                case "vvenc":
-                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.266"
-                case "vpxenc":
-                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
-                case _:
-                    self.dst_pth = f"./{p}_{self.encoder}_q{self.q}.ivf"
-        else:
-            match self.encoder:
-                case "x264":
-                    self.dst_pth = self.dst_pth + ".264"
-                case "x265":
-                    self.dst_pth = self.dst_pth + ".265"
-                case "vvenc":
-                    self.dst_pth = self.dst_pth + ".266"
-                case "vpxenc":
-                    self.dst_pth = self.dst_pth + ".ivf"
-                case _:
-                    self.dst_pth = self.dst_pth + ".ivf"
-
-        match self.encoder:
-            case "x264":
-                cmd: list[str] = [
-                    "x264",
-                    "--demuxer",
-                    "y4m",
-                    "--crf",
-                    f"{self.q}",
-                    "-o",
-                    f"{self.dst_pth}",
-                    "-",
-                ]
-            case "x265":
-                cmd: list[str] = [
-                    "x265",
-                    "--y4m",
-                    "-",
-                    "--crf",
-                    f"{self.q}",
-                    "-o",
-                    f"{self.dst_pth}",
-                ]
-            case "vvenc":
-                cmd: list[str] = [
-                    "vvencapp",
-                    "--y4m",
-                    "-i",
-                    "-",
-                    "--qp",
-                    f"{self.q}",
-                    "-o",
-                    f"{self.dst_pth}",
-                ]
-            case "svtav1":
-                cmd: list[str] = [
-                    "SvtAv1EncApp",
-                    "-i",
-                    "-",
-                    "-b",
-                    f"{self.dst_pth}",
-                    "--crf",
-                    f"{self.q}",
-                ]
-            case "vpxenc":
-                cmd: list[str] = [
-                    "vpxenc",
-                    "--codec=vp9",
-                    "--ivf",
-                    "--end-usage=q",
-                    "--bit-depth=10",
-                    "--input-bit-depth=10",
-                    "--profile=2",
-                    "--passes=1",
-                    f"--cq-level={self.q}",
-                ]
-            case _:  # "aomenc":
-                cmd: list[str] = [
-                    "aomenc",
-                    "--ivf",
-                    "--end-usage=q",
-                    f"--cq-level={self.q}",
-                    "--passes=1",
+        """
+        Set the encoder command based on the encoder choice.
+        """
+        cmd: list[str] = []
+        if self.enc == "x264":
+            cmd = (
+                [
+                    "ffmpeg",
                     "-y",
-                    "-",
-                    "-o",
-                    f"{self.dst_pth}",
+                    "-i",
+                    self.src.path,
+                    "-an",
+                    "-c:v",
+                    "libx264",
+                    "-crf",
+                    str(self.q),
                 ]
-
-        if self.encoder_args != [""]:
-            cmd.extend(self.encoder_args)
-        if self.encoder == "vpxenc":
-            extra_args: list[str] = ["-o", f"{self.dst_pth}", "-"]
-            cmd.extend(extra_args)
-        print(" ".join(cmd))
+                + self.enc_args
+                + [self.dst_pth]
+            )
+        elif self.enc == "x265":
+            cmd = (
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    self.src.path,
+                    "-an",
+                    "-c:v",
+                    "libx265",
+                    "-crf",
+                    str(self.q),
+                ]
+                + self.enc_args
+                + [self.dst_pth]
+            )
+        elif self.enc == "svtav1":
+            # SvtAv1EncApp only accepts y4m input; use a shell pipeline:
+            # ffmpeg (to y4m) | SvtAv1EncApp -i - -b - | ffmpeg -i - -c copy <dst>
+            enc_args_str = " ".join(shlex.quote(arg) for arg in self.enc_args) if self.enc_args else ""
+            ffmpeg_in = f'ffmpeg -hide_banner -loglevel error -i {shlex.quote(self.src.path)} -an -pix_fmt yuv420p10le -strict -2 -f yuv4mpegpipe -'
+            svt_cmd = f'SvtAv1EncApp -i - --rc 0 --crf {shlex.quote(str(self.q))} -b - {enc_args_str} --progress 3'
+            ffmpeg_out = f'ffmpeg -y -hide_banner -loglevel error -i - -c copy {shlex.quote(self.dst_pth)}'
+            # Return a shell string pipeline; encode() will run it with shell=True
+            cmd = f"{ffmpeg_in} | {svt_cmd} | {ffmpeg_out}"
+        elif self.enc == "aomenc":
+            cmd = (
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    self.src.path,
+                    "-an",
+                    "-c:v",
+                    "libaom-av1",
+                    "-crf",
+                    str(self.q),
+                    "-b:v",
+                    "0",
+                ]
+                + self.enc_args
+                + [self.dst_pth]
+            )
+        elif self.enc == "vpxenc":
+            cmd = (
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    self.src.path,
+                    "-an",
+                    "-c:v",
+                    "libvpx-vp9",
+                    "-crf",
+                    str(self.q),
+                    "-b:v",
+                    "0",
+                ]
+                + self.enc_args
+                + [self.dst_pth]
+            )
         return cmd
 
-    def encode(self, e: int, t: int, g: int) -> DstVideo:
+    def encode(self, every: int, threads: int, gpu_streams: int) -> DstVideo:
         """
-        Encode the video using FFmpeg piped to your chosen encoder.
+        Run the encoder and return a DstVideo object.
         """
-        ff_cmd: list[str] = [
-            "ffmpeg",
-            "-hide_banner",
-            "-y",
-            "-loglevel",
-            "error",
-            "-i",
-            f"{self.src.path}",
-            "-pix_fmt",
-            "yuv420p10le",
-            "-strict",
-            "-2",
-            "-f",
-            "yuv4mpegpipe",
-            "-",
-        ]
-        print(
-            f"Encoding {self.src.name} at Q{self.q} with {self.encoder} ({self.src.path} --> {self.dst_pth})"
-        )
-        ff_proc: Popen[bytes] = subprocess.Popen(
-            ff_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        start_time: float = time.time()
-        enc_proc: Popen[str] = subprocess.Popen(
-            self.enc_cmd,
-            stdin=ff_proc.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-        )
-        _, stderr = enc_proc.communicate()
-        encode_time: float = time.time() - start_time
-        self.time = encode_time
-        print(stderr)
-        return DstVideo(self.dst_pth, e, t, g)
+        cmd = self.set_enc_cmd()
+        print(f"Encoding with {self.enc} (CRF {self.q})...")
+        start_time = time.time()
+        # SvtAv1EncApp uses a shell pipeline string; run via shell=True in that case.
+        if self.enc == "svtav1":
+            subprocess.run(cmd, check=True, capture_output=True, shell=True)
+        else:
+            subprocess.run(cmd, check=True, capture_output=True)
+        self.time = time.time() - start_time
+        return DstVideo(self.dst_pth, every, threads, gpu_streams)
 
     def remove_output(self) -> None:
         """
-        Remove the output file.
+        Remove the output video file.
         """
-        os.remove(self.dst_pth)
+        if os.path.exists(self.dst_pth):
+            os.remove(self.dst_pth)
 
 
 def psnr_to_mse(p: float, m: int) -> float:
     """
     Convert PSNR to MSE (Mean Squared Error). Used in weighted XPSNR calculation.
     """
+    if p <= 0:
+        return float(m**2)
     return (m**2) / (10 ** (p / 10))
 
 
@@ -521,7 +514,9 @@ def calc_some_scores(score_list: list[float]) -> tuple[float, float, float]:
     """
     Calculate the average, standard deviation, & 10th percentile of a list of scores.
     """
+    if not score_list:
+        return 0.0, 0.0, 0.0
     average: float = statistics.mean(score_list)
-    std_dev: float = statistics.stdev(score_list)
+    std_dev: float = statistics.stdev(score_list) if len(score_list) > 1 else 0.0
     percentile_10th: float = statistics.quantiles(score_list, n=100)[10]
     return (average, std_dev, percentile_10th)

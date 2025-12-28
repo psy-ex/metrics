@@ -6,6 +6,7 @@ codecs using metrics such as:
 
 - Average SSIMULACRA2 across frames
 - Average Butteraugli (3pnorm) across frames
+- Average CVVDP across frames
 - Weighted XPSNR
 - VMAF NEG (Harmonic Mean)
 - VMAF
@@ -53,15 +54,10 @@ PSY-EX Metrics enables you to:
 
 - [uv](https://github.com/astral-sh/uv/blob/main/README.md), a Python project
   manager
-- FFmpeg >= 7.1 (required for XPSNR)
-- VapourSynth, and required plugins:
-  - ffms2
-  - [vszip](https://github.com/dnjulek/vapoursynth-zip)
-  - [vship](https://github.com/Line-fr/Vship) [Optional: provides GPU support]
+- FFmpeg >= 7.1 (required for XPSNR and video processing)
+- [FFVship](https://github.com/Line-fr/FFVship) (Standalone tool for GPU-accelerated metrics)
 
 ### Install Steps
-
-0. Install required dependencies outlined in the previous section
 
 1. Clone the repository
 
@@ -101,19 +97,19 @@ options:
   -h, --help            show this help message and exit
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
   -g, --gpu-streams GPU_STREAMS
-                        Number of GPU streams for SSIMULACRA2/Butteraugli
+                        Number of GPU threads for FFVship (SSIMULACRA2/Butteraugli/CVVDP)
   -t, --threads THREADS
-                        Number of threads for SSIMULACRA2/Butteraugli
+                        Number of decoder threads for FFVship. Default 2
 ```
 
 Example:
 
 ```bash
-./scores.py source.mkv distorted.mkv -e 3
+./scores.py source.mkv distorted.mkv -e 3 -g 8 -t 4
 ```
 
 This command compares a reference `source.mkv` with `distorted.mkv`, scoring
-every 3rd frame.
+every 3rd frame using 8 GPU threads and 4 decoder threads via FFVship.
 
 ### encode.py
 
@@ -136,27 +132,11 @@ options:
   -b, --keep KEEP       Output video file name
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
   -g, --gpu-streams GPU_STREAMS
-                        Number of GPU streams for SSIMULACRA2/Butteraugli
+                        Number of GPU threads for FFVship (SSIMULACRA2/Butteraugli/CVVDP)
   -t, --threads THREADS
-                        Number of threads for SSIMULACRA2/Butteraugli
+                        Number of decoder threads for FFVship. Default 2
   -n, --no-metrics      Skip metrics calculations
 ```
-
-Examples:
-
-```bash
-./encode.py -i source.mkv --keep video.ivf -q 29 svtav1 -- --preset 2
-```
-
-This command encodes `source.mkv` at a CRF of 29 using the SVT-AV1 encoder with
-the `--preset 2` argument. It will print metrics after encoding.
-
-```bash
-./encode.py -i source.mkv --keep video.ivf -q 29 -g 4 svtav1 -- --preset 8
-```
-
-This command does the same as the previous command, but uses 4 GPU streams
-(instead of using the CPU) as well as passing a higher preset value to SVT-AV1.
 
 ### stats.py
 
@@ -179,55 +159,10 @@ options:
   -o, --output OUTPUT   Path to output CSV file
   -e, --every EVERY     Only score every nth frame. Default 1 (every frame)
   -g, --gpu-streams GPU_STREAMS
-                        Number of GPU streams for SSIMULACRA2/Butteraugli
+                        Number of GPU threads for FFVship (SSIMULACRA2/Butteraugli/CVVDP)
   -t, --threads THREADS
-                        Number of threads for SSIMULACRA2/Butteraugli
+                        Number of decoder threads for FFVship. Default 2
   -k, --keep            Keep output video files
-```
-
-Example:
-
-```bash
-./stats.py \
-  -i source.mkv \
-  -q "20 25 30 35 40" \
-  -o ./svtav1_2.3.0-B_p8.csv \
-  -e 3 \
-  svtav1 -- --preset 8 --tune 2
-```
-
-This command processes `source.mkv` at quality levels 20, 25, 30, 35, & 40 using
-the SVT-AV1 encoder, scoring every 3rd frame, and writes the results to an
-output `svtav1_2.3.0-B_p8.csv`.
-
-You can also script this to run across multiple speed presets:
-
-```bash
-#!/bin/bash -eu
-
-for speed in {2..6}; do
-  ./stats.py \
-  -i ~/Videos/reference/*.y4m \
-  -q "20 25 30 35 40" \
-  -o ./svtav1_2.3.0-B_p${speed}.csv \
-  -e 3 \
-  svtav1 -- --preset $speed --tune 2
-done
-```
-
-This snippet here will run the same command as before, but across all speed
-presets from 2 to 6 (naming the output CSV files accordingly). It will also
-encode all of the files ending in `.y4m` in the `~/Videos/reference` directory.
-
-You can also use libvpx for VP9 benchmarking:
-
-```bash
-./stats.py \
-  -i source.mkv \
-  -q "20 25 30 35 40" \
-  -o ./libvpx_vp9.csv \
-  -g 4 \
-  vpxenc -- --cpu-used=4
 ```
 
 ### plot.py
@@ -244,39 +179,6 @@ options:
                         Path(s) to CSV file(s). Each CSV file should have the same columns.
   -f, --format FORMAT   Save the plot as 'svg', 'png', or 'webp'
 ```
-
-Example:
-
-```bash
-./plot.py -i codec1_results.csv codec2_results.csv -f webp
-```
-
-This command reads `codec1_results.csv` and `codec2_results.csv`, generating
-separate plots (one for each metric) as WebP images.
-
-It will also print BD-rate statistics for each metric, comparing the two results
-from the CSV files.
-
-`plot.py` also outputs a CSV file containing the average encode time for an
-input file accompanied by the corresponding average BD-rate. These statistics
-can assist in looking at overall encoder efficiency across multiple speed
-presets or configurations.
-
-### Run via Docker
-
-<i> See the pre-requisites for host machine:
-https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html
-</i>
-
-1. Build image against your GPU architechture:
-   ```bash
-   GPU_ARCH=$(amdgpu-arch) docker-compose --build
-   ```
-
-2. Run `docker-compose`:
-   ```bash
-   docker-compose -f <docker-compose-file> run -v <host-path>:/videos metrics-rocm <scores|plot|encode|stats> <..args>
-   ```
 
 ## License
 

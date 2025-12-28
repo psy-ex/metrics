@@ -5,8 +5,6 @@
 #     "argparse>=1.4.0",
 #     "statistics>=1.0.3.5",
 #     "tqdm>=4.67.1",
-#     "vapoursynth>=70",
-#     "vstools>=3.3.4",
 # ]
 # ///
 
@@ -24,6 +22,7 @@ def write_stats(
     size: int,
     ssimu2_mean: float,
     butter_distance: float,
+    cvvdp_mean: float,
     w_xpsnr: float,
     vmaf_neg: float,
     vmaf: float,
@@ -38,15 +37,15 @@ def write_stats(
     if not os.path.exists(csv):
         with open(csv, "w") as f:
             f.write(
-                "q,encode_time,output_filesize,ssimu2_mean,butter_distance,wxpsnr,vmaf_neg,vmaf,ssim,psnr\n"
+                "q,encode_time,output_filesize,ssimu2_mean,butter_distance,cvvdp_mean,wxpsnr,vmaf_neg,vmaf,ssim,psnr\n"
             )
             f.write(
-                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f},{vmaf_neg:.5f},{vmaf:.5f},{ssim:.5f},{psnr:.5f}\n"
+                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{cvvdp_mean:.5f},{w_xpsnr:.5f},{vmaf_neg:.5f},{vmaf:.5f},{ssim:.5f},{psnr:.5f}\n"
             )
     else:
         with open(csv, "a") as f:
             f.write(
-                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{w_xpsnr:.5f},{vmaf_neg:.5f},{vmaf:.5f},{ssim:.5f},{psnr:.5f}\n"
+                f"{q},{encode_time:.5f},{size},{ssimu2_mean:.5f},{butter_distance:.5f},{cvvdp_mean:.5f},{w_xpsnr:.5f},{vmaf_neg:.5f},{vmaf:.5f},{ssim:.5f},{psnr:.5f}\n"
             )
 
 
@@ -90,14 +89,14 @@ def main():
         "--gpu-streams",
         type=int,
         default=0,
-        help="Number of GPU streams for SSIMULACRA2/Butteraugli",
+        help="Number of FFVship GPU threads (SSIMULACRA2/Butteraugli/CVVDP)",
     )
     parser.add_argument(
         "-t",
         "--threads",
         type=int,
-        default=0,
-        help="Number of threads for SSIMULACRA2/Butteraugli",
+        default=2,
+        help="Number of decoder threads for FFVship. Default 2",
     )
     parser.add_argument(
         "-k",
@@ -120,7 +119,7 @@ def main():
     csv_out: str = args.output
     every: int = args.every
     threads: int = args.threads
-    gpu_streams: bool = args.gpu_streams
+    gpu_streams: int = args.gpu_streams
     clean: bool = args.keep
     enc_args: list[str] = args.encoder_args
 
@@ -134,6 +133,9 @@ def main():
         {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
     ]
     cumulative_butter: list[dict[int, float]] = [
+        {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
+    ]
+    cumulative_cvvdp: list[dict[int, float]] = [
         {q: 0.0 for q in quality_list} for _ in range(len(src_pth))
     ]
     cumulative_wxpsnr: list[dict[int, float]] = [
@@ -166,12 +168,14 @@ def main():
 
             v.calculate_ssimulacra2(s)
             v.calculate_butteraugli(s)
+            v.calculate_cvvdp(s)
             v.calculate_ffmpeg_metrics(s)
 
             cumulative_times[i][q] = e.time
             cumulative_sizes[i][q] = v.size
             cumulative_ssimu2[i][q] = v.ssimu2_avg
             cumulative_butter[i][q] = v.butter_dis
+            cumulative_cvvdp[i][q] = v.cvvdp_avg
             cumulative_wxpsnr[i][q] = v.w_xpsnr
             cumulative_vmafneg[i][q] = v.vmaf_neg_hmn
             cumulative_vmaf[i][q] = v.vmaf
@@ -186,6 +190,7 @@ def main():
     avg_size: dict[int, int] = {}
     avg_ssimu2: dict[int, float] = {}
     avg_butter: dict[int, float] = {}
+    avg_cvvdp: dict[int, float] = {}
     avg_wxpsnr: dict[int, float] = {}
     avg_vmafneg: dict[int, float] = {}
     avg_vmaf: dict[int, float] = {}
@@ -197,6 +202,7 @@ def main():
         avg_size[q] = int(sum(cumulative_sizes[j][q] for j in range(i)) / i)
         avg_ssimu2[q] = sum(cumulative_ssimu2[j][q] for j in range(i)) / i
         avg_butter[q] = sum(cumulative_butter[j][q] for j in range(i)) / i
+        avg_cvvdp[q] = sum(cumulative_cvvdp[j][q] for j in range(i)) / i
         avg_wxpsnr[q] = sum(cumulative_wxpsnr[j][q] for j in range(i)) / i
         avg_vmafneg[q] = sum(cumulative_vmafneg[j][q] for j in range(i)) / i
         avg_vmaf[q] = sum(cumulative_vmaf[j][q] for j in range(i)) / i
@@ -209,6 +215,7 @@ def main():
             avg_size[q],
             avg_ssimu2[q],
             avg_butter[q],
+            avg_cvvdp[q],
             avg_wxpsnr[q],
             avg_vmafneg[q],
             avg_vmaf[q],

@@ -5,8 +5,6 @@
 #     "argparse>=1.4.0",
 #     "statistics>=1.0.3.5",
 #     "tqdm>=4.67.1",
-#     "vapoursynth>=70",
-#     "vstools>=3.3.4",
 # ]
 # ///
 
@@ -34,14 +32,14 @@ def main() -> None:
         "--gpu-streams",
         type=int,
         default=0,
-        help="Number of GPU streams for SSIMULACRA2/Butteraugli",
+        help="Number of FFVship GPU threads (SSIMULACRA2/Butteraugli/CVVDP)",
     )
     parser.add_argument(
         "-t",
         "--threads",
         type=int,
-        default=0,
-        help="Number of threads for SSIMULACRA2/Butteraugli",
+        default=2,
+        help="Number of decoder threads for FFVship. Default 2",
     )
 
     args: Namespace = parser.parse_args()
@@ -60,11 +58,12 @@ def main() -> None:
     v.print_ssimulacra2()
 
     # Calculate Butteraugli scores
-    if gpu_streams:
-        v.calculate_butteraugli(s)
-        v.print_butteraugli()
-    else:
-        v.calculate_butteraugli(s)
+    v.calculate_butteraugli(s)
+    v.print_butteraugli()
+
+    # Calculate CVVDP scores
+    v.calculate_cvvdp(s)
+    v.print_cvvdp()
 
     # Calculate XPSNR scores
     v.calculate_ffmpeg_metrics(s)
