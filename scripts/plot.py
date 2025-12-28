@@ -25,7 +25,7 @@ def read_csv(filename):
     """
     Read CSV file and return data as dictionary of lists.
     Assumes CSV columns: 'q', 'encode_time', 'output_filesize',
-    'ssimu2_mean', 'butter_distance', 'wxpsnr', 'vmaf_neg',
+    'ssimu2_mean', 'butter_distance', 'cvvdp_mean', 'wxpsnr', 'vmaf_neg',
     'vmaf', 'ssim', and 'psnr'.
     """
     data = {
@@ -34,6 +34,7 @@ def read_csv(filename):
         "output_filesize": [],
         "ssimu2_mean": [],
         "butter_distance": [],
+        "cvvdp_mean": [],
         "wxpsnr": [],
         "vmaf_neg": [],
         "vmaf": [],
@@ -45,7 +46,8 @@ def read_csv(filename):
         reader = csv.DictReader(csvfile)
         for row in reader:
             for key in data:
-                data[key].append(float(row[key]))
+                if key in row:
+                    data[key].append(float(row[key]))
     return data
 
 
@@ -63,6 +65,7 @@ def bdrate_vs_time_csv(
         "avg_encode_time",
         "ssimu2_mean_bd",
         "butter_distance_bd",
+        "cvvdp_mean_bd",
         "wxpsnr_bd",
         "vmaf_neg_bd",
         "vmaf_bd",
@@ -74,14 +77,14 @@ def bdrate_vs_time_csv(
         # Append to existing file
         with open(csv_file, "a") as f:
             f.write(
-                f"{name},{time:.5f},{bd_rates.get('ssimu2_mean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f},{bd_rates.get('vmaf_neg', 0):.5f},{bd_rates.get('vmaf', 0):.5f},{bd_rates.get('ssim', 0):.5f},{bd_rates.get('psnr', 0):.5f}\n"
+                f"{name},{time:.5f},{bd_rates.get('ssimu2_mean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('cvvdp_mean', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f},{bd_rates.get('vmaf_neg', 0):.5f},{bd_rates.get('vmaf', 0):.5f},{bd_rates.get('ssim', 0):.5f},{bd_rates.get('psnr', 0):.5f}\n"
             )
     else:
         # Create new file with headers
         with open(csv_file, "w") as f:
             f.write(",".join(headers) + "\n")
             f.write(
-                f"{name},{time:.5f},{bd_rates.get('ssimu2_mean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f},{bd_rates.get('vmaf_neg', 0):.5f},{bd_rates.get('vmaf', 0):.5f},{bd_rates.get('ssim', 0):.5f},{bd_rates.get('psnr', 0):.5f}\n"
+                f"{name},{time:.5f},{bd_rates.get('ssimu2_mean', 0):.5f},{bd_rates.get('butter_distance', 0):.5f},{bd_rates.get('cvvdp_mean', 0):.5f},{bd_rates.get('wxpsnr', 0):.5f},{bd_rates.get('vmaf_neg', 0):.5f},{bd_rates.get('vmaf', 0):.5f},{bd_rates.get('ssim', 0):.5f},{bd_rates.get('psnr', 0):.5f}\n"
             )
 
 
@@ -104,6 +107,7 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
     colormaps = {
         "ssimu2_mean": plt.colormaps.get_cmap("Blues"),
         "butter_distance": plt.colormaps.get_cmap("YlOrBr"),
+        "cvvdp_mean": plt.colormaps.get_cmap("Greens"),
         "wxpsnr": plt.colormaps.get_cmap("Reds"),
         "vmaf_neg": plt.colormaps.get_cmap("RdGy"),
         "vmaf": plt.colormaps.get_cmap("autumn"),
@@ -148,6 +152,7 @@ def create_metric_plot(datasets, metric_name: str, fmt: str):
     metric_labels = {
         "ssimu2_mean": "Average SSIMULACRA2",
         "butter_distance": "Butteraugli Distance",
+        "cvvdp_mean": "Average CVVDP",
         "wxpsnr": "W-XPSNR",
         "vmaf_neg": "VMAF NEG (Harmonic Mean)",
         "vmaf": "VMAF",
@@ -234,6 +239,8 @@ def calculate_average_encode_time(data):
     Calculate the average encode time from the data.
     """
     encode_times = data["encode_time"]
+    if not encode_times:
+        return 0.0
     return sum(encode_times) / len(encode_times)
 
 
@@ -271,6 +278,7 @@ def main():
     metrics = [
         "ssimu2_mean",
         "butter_distance",
+        "cvvdp_mean",
         "wxpsnr",
         "vmaf_neg",
         "vmaf",
@@ -278,7 +286,9 @@ def main():
         "psnr",
     ]
     for metric in metrics:
-        create_metric_plot(datasets, metric, fmt)
+        # Only plot if the metric exists in the datasets
+        if any(metric in d[1] and d[1][metric] for d in datasets):
+            create_metric_plot(datasets, metric, fmt)
 
     # Calculate and output the average encode time for each CSV file
     for label, data in datasets:
@@ -290,6 +300,7 @@ def main():
         metric_labels = {
             "ssimu2_mean": "\033[94mSSIMULACRA2\033[0m Average:       ",
             "butter_distance": "\033[93mButteraugli\033[0m Distance:      ",
+            "cvvdp_mean": "\033[92mCVVDP\033[0m Average:             ",
             "wxpsnr": "W-\033[91mXPSNR\033[0m:                   ",
             "vmaf_neg": "\033[38;5;208mVMAF NEG\033[0m (Harmonic Mean):  ",
             "vmaf": "\033[38;5;208mVMAF\033[0m:                      ",
@@ -312,6 +323,15 @@ def main():
                 # Create lists of tuples (output_filesize, metric_value) for the two files.
                 data1 = datasets[0][1]
                 data2 = datasets[idx][1]
+
+                if (
+                    metric not in data1
+                    or metric not in data2
+                    or not data1[metric]
+                    or not data2[metric]
+                ):
+                    continue
+
                 metric_set1 = list(zip(data1["output_filesize"], data1[metric]))
                 metric_set2 = list(zip(data2["output_filesize"], data2[metric]))
 
