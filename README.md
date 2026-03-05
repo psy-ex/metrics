@@ -6,7 +6,7 @@ codecs using metrics such as:
 
 - Average SSIMULACRA2 across frames
 - Average Butteraugli (3pnorm) across frames
-- Average CVVDP across frames
+- Final CVVDP score across frames
 - Weighted XPSNR
 - VMAF NEG (Harmonic Mean)
 - VMAF
