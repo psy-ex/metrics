@@ -7,9 +7,6 @@ import time
 from subprocess import Popen
 import shlex
 
-from tqdm import tqdm
-
-
 class CoreVideo:
     """
     Source video class.
@@ -74,16 +71,13 @@ class DstVideo(CoreVideo):
     # SSIMULACRA2 scores
     ssimu2_avg: float
     ssimu2_sdv: float
-    ssimu2_p10: float
+    ssimu2_p05: float
 
     # Butteraugli scores
-    butter_dis: float
-    butter_mds: float
+    butter_3nm: float
 
-    # CVVDP scores
-    cvvdp_avg: float
-    cvvdp_sdv: float
-    cvvdp_p10: float
+    # CVVDP score
+    cvvdp: float
 
     # XPSNR scores
     xpsnr_y: float
@@ -108,12 +102,9 @@ class DstVideo(CoreVideo):
         super().__init__(pth, e, t, g)
         self.ssimu2_avg = 0.0
         self.ssimu2_sdv = 0.0
-        self.ssimu2_p10 = 0.0
-        self.butter_dis = 0.0
-        self.butter_mds = 0.0
-        self.cvvdp_avg = 0.0
-        self.cvvdp_sdv = 0.0
-        self.cvvdp_p10 = 0.0
+        self.ssimu2_p05 = 0.0
+        self.butter_3nm = 0.0
+        self.cvvdp = 0.0
         self.xpsnr_y = 0.0
         self.xpsnr_u = 0.0
         self.xpsnr_v = 0.0
@@ -124,11 +115,11 @@ class DstVideo(CoreVideo):
         self.psnr = 0.0
         self.svt_triple = 0.0
 
-    def _run_ffvship(
+    def run_ffvship(
         self, src: CoreVideo, metric: str, extra_args: list[str] | None = None
-    ) -> list[float]:
+    ) -> str:
         """
-        Run FFVship for a specific metric and return a list of per-frame scores.
+        Run FFVship for a specific metric and return the full output string.
         """
         cmd = [
             "FFVship",
@@ -144,98 +135,66 @@ class DstVideo(CoreVideo):
             str(self.threads),
             "--every",
             str(self.e),
-            "--live-score-output",
         ]
         if extra_args:
             cmd.extend(extra_args)
 
-        scores: list[float] = []
-
-        # Try to get frame count for tqdm
-        total_frames = 0
-        ffprobe_cmd = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=nb_frames",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            src.path,
-        ]
-        try:
-            res = subprocess.run(ffprobe_cmd, capture_output=True, text=True)
-            total_frames = int(res.stdout.strip()) // self.e
-        except Exception:
-            total_frames = 0
-
-        process = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=True
         )
 
-        desc_map = {
-            "SSIMULACRA2": "Calculating SSIMULACRA2 scores",
-            "Butteraugli": "Calculating Butteraugli scores",
-            "CVVDP": "Calculating CVVDP scores",
-        }
-        color_map = {
-            "SSIMULACRA2": "blue",
-            "Butteraugli": "yellow",
-            "CVVDP": "green",
-        }
-
-        with tqdm(
-            total=total_frames if total_frames > 0 else None,
-            desc=desc_map.get(metric, f"Calculating {metric} scores"),
-            unit=" frame",
-            colour=color_map.get(metric, "white"),
-        ) as pbar:
-            if process.stdout:
-                for line in process.stdout:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        parts = line.split()
-                        if len(parts) == 2:
-                            score = float(parts[1])
-                            scores.append(score)
-                            pbar.update(1)
-                            if len(scores) % 24 == 0:
-                                avg = sum(scores) / len(scores)
-                                pbar.set_postfix({"avg": f"{avg:.2f}"})
-                    except ValueError:
-                        pass
-        process.wait()
-        return scores
+        return result.stdout + result.stderr
 
     def calculate_ssimulacra2(self, src: CoreVideo) -> None:
         """
         Calculate SSIMULACRA2 score between a source video & a distorted video using FFVship.
         """
-        scores = self._run_ffvship(src, "SSIMULACRA2")
-        if scores:
-            self.ssimu2_avg, self.ssimu2_sdv, self.ssimu2_p10 = calc_some_scores(scores)
+        print("Calculating SSIMULACRA2... ", end="")
+        output = self.run_ffvship(src, "SSIMULACRA2")
+
+        avg_match = re.search(r'Average\s*:\s*(\d+\.\d+)', output)
+        std_match = re.search(r'Standard Deviation\s*:\s*(\d+\.\d+)', output)
+        p5_match = re.search(r'5th percentile\s*:\s*(-?\d+\.\d+)', output)
+
+        if avg_match:
+            self.ssimu2_avg = float(avg_match.group(1))
+            print(f"({self.ssimu2_avg:.2f})")
+        if std_match:
+            self.ssimu2_sdv = float(std_match.group(1))
+        if p5_match:
+            self.ssimu2_p05 = float(p5_match.group(1))
 
     def calculate_butteraugli(self, src: CoreVideo) -> None:
         """
         Calculate Butteraugli score between a source video & a distorted video using FFVship.
         """
-        # Use --qnorm 3 to match previous behavior (3pnorm)
-        scores = self._run_ffvship(src, "Butteraugli", ["--qnorm", "3"])
-        if scores:
-            self.butter_dis = sum(scores) / len(scores)
-            self.butter_mds = max(scores)
+        print("Calculating Butteraugli 3-norm... ", end="")
+        output = self.run_ffvship(src, "Butteraugli", ["--qnorm", "3"])
+
+        three_norm_match = re.search(
+            r'-+3-Norm-+.*?(?:\n\n|$)',
+            output,
+            re.DOTALL
+        )
+        if three_norm_match:
+            section = three_norm_match.group(0)
+            avg_match = re.search(r'Average\s*:\s*(\d+\.\d+)', section)
+            if avg_match:
+                self.butter_3nm = float(avg_match.group(1))
+                print(f"({self.butter_3nm:.2f})")
 
     def calculate_cvvdp(self, src: CoreVideo) -> None:
         """
         Calculate CVVDP score between a source video & a distorted video using FFVship.
         """
-        scores = self._run_ffvship(src, "CVVDP")
-        if scores:
-            self.cvvdp_avg, self.cvvdp_sdv, self.cvvdp_p10 = calc_some_scores(scores)
+        print("Calculating CVVDP... ", end="")
+        output = self.run_ffvship(src, "CVVDP")
+
+        score_match = re.search(r'Video Score:\s*(\d+\.\d+)', output)
+
+        if score_match:
+            self.cvvdp = float(score_match.group(1))
+            print(f"({self.cvvdp:.3f})")
 
     def calculate_ffmpeg_metrics(self, src: CoreVideo) -> None:
         """
@@ -329,22 +288,19 @@ class DstVideo(CoreVideo):
         """
         print(f"SSIMULACRA2 Average:       \033[1m{self.ssimu2_avg:.5f}\033[0m")
         print(f"SSIMULACRA2 Std Dev:       {self.ssimu2_sdv:.5f}")
-        print(f"SSIMULACRA2 10th %:        {self.ssimu2_p10:.5f}")
+        print(f"SSIMULACRA2 5th %:         {self.ssimu2_p05:.5f}")
 
     def print_butteraugli(self) -> None:
         """
         Print Butteraugli scores.
         """
-        print(f"Butteraugli Distance:      \033[1m{self.butter_dis:.5f}\033[0m")
-        print(f"Butteraugli Max Distance:  {self.butter_mds:.5f}")
+        print(f"Butteraugli Distance:      \033[1m{self.butter_3nm:.5f}\033[0m")
 
     def print_cvvdp(self) -> None:
         """
         Print CVVDP scores.
         """
-        print(f"CVVDP Average:             \033[1m{self.cvvdp_avg:.5f}\033[0m")
-        print(f"CVVDP Std Dev:             {self.cvvdp_sdv:.5f}")
-        print(f"CVVDP 10th %:              {self.cvvdp_p10:.5f}")
+        print(f"CVVDP:             \033[1m{self.cvvdp:.5f}\033[0m")
 
     def print_ffmpeg_metrics(self) -> None:
         """
@@ -508,15 +464,3 @@ def psnr_to_mse(p: float, m: int) -> float:
     if p <= 0:
         return float(m**2)
     return (m**2) / (10 ** (p / 10))
-
-
-def calc_some_scores(score_list: list[float]) -> tuple[float, float, float]:
-    """
-    Calculate the average, standard deviation, & 10th percentile of a list of scores.
-    """
-    if not score_list:
-        return 0.0, 0.0, 0.0
-    average: float = statistics.mean(score_list)
-    std_dev: float = statistics.stdev(score_list) if len(score_list) > 1 else 0.0
-    percentile_10th: float = statistics.quantiles(score_list, n=100)[10]
-    return (average, std_dev, percentile_10th)

@@ -4,7 +4,6 @@
 # dependencies = [
 #     "argparse>=1.4.0",
 #     "statistics>=1.0.3.5",
-#     "tqdm>=4.67.1",
 # ]
 # ///
 
@@ -174,8 +173,8 @@ def main():
             cumulative_times[i][q] = e.time
             cumulative_sizes[i][q] = v.size
             cumulative_ssimu2[i][q] = v.ssimu2_avg
-            cumulative_butter[i][q] = v.butter_dis
-            cumulative_cvvdp[i][q] = v.cvvdp_avg
+            cumulative_butter[i][q] = v.butter_3nm
+            cumulative_cvvdp[i][q] = v.cvvdp
             cumulative_wxpsnr[i][q] = v.w_xpsnr
             cumulative_vmafneg[i][q] = v.vmaf_neg_hmn
             cumulative_vmaf[i][q] = v.vmaf
