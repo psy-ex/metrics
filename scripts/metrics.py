@@ -1,11 +1,12 @@
 import math
 import os
 import re
+import shlex
 import statistics
 import subprocess
 import time
 from subprocess import Popen
-import shlex
+
 
 class CoreVideo:
     """
@@ -139,9 +140,7 @@ class DstVideo(CoreVideo):
         if extra_args:
             cmd.extend(extra_args)
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         return result.stdout + result.stderr
 
@@ -152,9 +151,9 @@ class DstVideo(CoreVideo):
         print("Calculating SSIMULACRA2... ", end="")
         output = self.run_ffvship(src, "SSIMULACRA2")
 
-        avg_match = re.search(r'Average\s*:\s*(\d+\.\d+)', output)
-        std_match = re.search(r'Standard Deviation\s*:\s*(\d+\.\d+)', output)
-        p5_match = re.search(r'5th percentile\s*:\s*(-?\d+\.\d+)', output)
+        avg_match = re.search(r"Average\s*:\s*(\d+\.\d+)", output)
+        std_match = re.search(r"Standard Deviation\s*:\s*(\d+\.\d+)", output)
+        p5_match = re.search(r"5th percentile\s*:\s*(-?\d+\.\d+)", output)
 
         if avg_match:
             self.ssimu2_avg = float(avg_match.group(1))
@@ -171,14 +170,10 @@ class DstVideo(CoreVideo):
         print("Calculating Butteraugli 3-norm... ", end="")
         output = self.run_ffvship(src, "Butteraugli", ["--qnorm", "3"])
 
-        three_norm_match = re.search(
-            r'-+3-Norm-+.*?(?:\n\n|$)',
-            output,
-            re.DOTALL
-        )
+        three_norm_match = re.search(r"-+3-Norm-+.*?(?:\n\n|$)", output, re.DOTALL)
         if three_norm_match:
             section = three_norm_match.group(0)
-            avg_match = re.search(r'Average\s*:\s*(\d+\.\d+)', section)
+            avg_match = re.search(r"Average\s*:\s*(\d+\.\d+)", section)
             if avg_match:
                 self.butter_3nm = float(avg_match.group(1))
                 print(f"({self.butter_3nm:.2f})")
@@ -190,7 +185,7 @@ class DstVideo(CoreVideo):
         print("Calculating CVVDP... ", end="")
         output = self.run_ffvship(src, "CVVDP")
 
-        score_match = re.search(r'Video Score:\s*(\d+\.\d+)', output)
+        score_match = re.search(r"Video Score:\s*(\d+\.\d+)", output)
 
         if score_match:
             self.cvvdp = float(score_match.group(1))
@@ -390,10 +385,14 @@ class VideoEnc:
         elif self.enc == "svtav1":
             # SvtAv1EncApp only accepts y4m input; use a shell pipeline:
             # ffmpeg (to y4m) | SvtAv1EncApp -i - -b - | ffmpeg -i - -c copy <dst>
-            enc_args_str = " ".join(shlex.quote(arg) for arg in self.enc_args) if self.enc_args else ""
-            ffmpeg_in = f'ffmpeg -hide_banner -loglevel error -i {shlex.quote(self.src.path)} -an -pix_fmt yuv420p10le -strict -2 -f yuv4mpegpipe -'
-            svt_cmd = f'SvtAv1EncApp -i - --rc 0 --crf {shlex.quote(str(self.q))} -b - {enc_args_str} --progress 3'
-            ffmpeg_out = f'ffmpeg -y -hide_banner -loglevel error -i - -c copy {shlex.quote(self.dst_pth)}'
+            enc_args_str = (
+                " ".join(shlex.quote(arg) for arg in self.enc_args)
+                if self.enc_args
+                else ""
+            )
+            ffmpeg_in = f"ffmpeg -hide_banner -loglevel error -i {shlex.quote(self.src.path)} -an -pix_fmt yuv420p10le -strict -2 -f yuv4mpegpipe -"
+            svt_cmd = f"SvtAv1EncApp -i - --rc 0 --crf {shlex.quote(str(self.q))} -b - {enc_args_str} --progress 3"
+            ffmpeg_out = f"ffmpeg -y -hide_banner -loglevel error -i - -c copy {shlex.quote(self.dst_pth)}"
             # Return a shell string pipeline; encode() will run it with shell=True
             cmd = f"{ffmpeg_in} | {svt_cmd} | {ffmpeg_out}"
         elif self.enc == "aomenc":
